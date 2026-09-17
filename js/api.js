@@ -27,5 +27,8 @@ const Api = {
   abonneer(abonnement, apparaat) { return this.call("/push/abonneer", { method: "POST", body: { abonnement, apparaat } }); },
   pushTest() { return this.call("/push/test", { method: "POST" }); },
   verzamel(model = false) { return this.call("/run/verzamel?model=" + model, { method: "POST" }); },
+  opdrachten() { return this.call("/opdrachten"); },
+  opdrachtAnnuleer(id) { return this.call(`/opdrachten/${id}/annuleer`, { method: "POST" }); },
+  opdrachtGezien(id) { return this.call(`/opdrachten/${id}/gezien`, { method: "POST" }); },
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },
 };

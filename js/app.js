@@ -112,12 +112,15 @@ const App = {
       </section>
       ${v.top.length ? `<h2>Nu belangrijk</h2><div id="top">${v.top.slice(0, 3).map((it) => this.itemRij(it)).join("")}</div>
         <button type="button" class="btn-link" id="naar-overzicht">Alle ${v.aantal_open} open punten ${IC("ic-chevron")}</button>` : ""}
+      ${(v.opdrachten || []).length ? `<h2>Opdrachten</h2>${v.opdrachten.map((o) => this.opdrachtRij(o)).join("")}` : ""}
       <h2>Vraag of zeg iets</h2>
       <div class="chips">
         <button type="button" class="chip" data-vraag="Wat moet ik vandaag echt niet vergeten?">Wat niet vergeten?</button>
         <button type="button" class="chip" data-vraag="Wat staat er open voor klanten?">Open voor klanten</button>
         <button type="button" class="chip" data-vraag="Welke facturen staan nog open?">Facturen</button>
         <button type="button" class="chip" data-vraag="Hoe ziet morgen eruit?">Morgen</button>
+        <button type="button" class="chip" data-vul="Zet een mailconcept klaar naar ">Mailconcept…</button>
+        <button type="button" class="chip" data-vul="Bereid mijn meeting voor met ">Meeting voorbereiden…</button>
       </div>
       <div id="gesprek" class="gesprek">${this.gesprek.map((b) => this.belHtml(b)).join("")}</div>
       <p id="dicteer-hint" class="hint hidden"></p>
@@ -129,6 +132,9 @@ const App = {
     this.bindItems(m);
     m.querySelector("#naar-overzicht")?.addEventListener("click", () => { this.project = null; this.ga("overzicht"); });
     m.querySelectorAll(".chip[data-vraag]").forEach((c) => c.addEventListener("click", () => this.stuur(c.dataset.vraag, false)));
+    m.querySelectorAll(".chip[data-vul]").forEach((c) => c.addEventListener("click", () => { const i = m.querySelector("#vraag-tekst"); i.value = c.dataset.vul; i.focus(); }));
+    m.querySelectorAll("[data-opdracht-annuleer]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtAnnuleer(b.dataset.opdrachtAnnuleer); this.toast("Opdracht geannuleerd"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
+    m.querySelectorAll("[data-opdracht-gezien]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtGezien(b.dataset.opdrachtGezien); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     const input = m.querySelector("#vraag-tekst");
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.stuur(input.value, false); } });
     m.querySelector("#btn-stuur").addEventListener("click", () => this.stuur(input.value, false));
@@ -136,8 +142,24 @@ const App = {
     if (this.gesprek.length) this.scrollGesprek();
   },
 
+  opdrachtRij(o) {
+    const naam = { mailconcept: "Mailconcept", meeting_voorbereiden: "Meeting voorbereiden", projectdoc: "Projectdoc bijwerken", offerte: "Offerte", overig: "Opdracht" }[o.soort] || "Opdracht";
+    const status = { wacht: ["grijs", "in de wachtrij"], bezig: ["oranje", "bezig"], klaar: ["groen", "klaar"], mislukt: ["rood", "niet gelukt"] }[o.status] || ["grijs", o.status];
+    const link = (o.resultaat || "").match(/https?:\/\/\S+/);
+    return `<div class="card opdracht">
+      <div class="kop"><b>${naam}</b><span class="tag ${status[0]}">${status[1]}</span></div>
+      <p class="stil">${esc(o.tekst)}</p>
+      ${o.resultaat ? `<p class="omschr">${esc(o.resultaat.replace(/https?:\/\/\S+/, "").trim())}</p>` : o.status === "wacht" ? `<p class="hint">Wordt binnen een uur opgepakt; je krijgt een melding.</p>` : ""}
+      <div class="rij">
+        ${link ? `<a class="btn-link" href="${esc(link[0])}" target="_blank" rel="noopener">Openen ${IC("ic-chevron")}</a>` : ""}
+        ${o.status === "wacht" ? `<button type="button" class="btn-secondary" data-opdracht-annuleer="${o.id}">Annuleren</button>` : ""}
+        ${o.status === "klaar" || o.status === "mislukt" ? `<button type="button" class="btn-secondary" data-opdracht-gezien="${o.id}">${IC("ic-vink")} Gezien</button>` : ""}
+      </div>
+    </div>`;
+  },
+
   belHtml(b) {
-    return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map((a) => `<span class="tag groen">${IC("ic-vink")} ${esc(a.titel)}</span>`).join("")}</div>` : ""}</div>`;
+    return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map((a) => `<span class="tag ${a.actie === "opdracht" ? "oranje" : "groen"}">${IC(a.actie === "opdracht" ? "ic-klok" : "ic-vink")} ${a.actie === "opdracht" ? "In de wachtrij: " : ""}${esc(a.titel)}</span>`).join("")}</div>` : ""}</div>`;
   },
   scrollGesprek() { const g = document.getElementById("gesprek"); if (g) g.lastElementChild?.scrollIntoView({ block: "nearest" }); },
 
@@ -172,7 +194,7 @@ const App = {
       Object.assign(wacht, { tekst: r.antwoord, wacht: false, acties: r.acties });
       const inst = await Opslag.instellingen();
       if (viaSpraak || inst.stem !== false) Spraak.spreek(r.antwoord, inst.stemNaam);
-      if (r.acties?.length) this.checkStatus();
+      if (r.acties?.length) { this.checkStatus(); if (r.acties.some((a) => a.actie === "opdracht") && this.tab === "assistent") setTimeout(() => this.render(), 1500); }
     } catch (e) {
       Object.assign(wacht, { tekst: "Dat lukte even niet: " + e.message, wacht: false, fout: true });
     }

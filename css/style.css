@@ -236,3 +236,6 @@ label input:not([type=checkbox]) { margin-top: 4px; }
 .toast-knop { background: rgba(255,255,255,.15); color: #fff; padding: 6px 12px; min-height: 32px; min-width: 0; font-weight: 600; margin-left: auto; white-space: nowrap; flex-shrink: 0; border-radius: 6px; }
 html[data-theme="dark"] .toast-knop { color: var(--bg-primary); }
 .toast.fout .toast-knop { color: #fff; }
+
+.opdracht .rij { margin-top: 6px; }
+.opdracht .btn-link { padding-left: 0; }
