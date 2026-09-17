@@ -1,35 +1,50 @@
-/* Schermen en interactie. Alles wat data is komt van de backend; hier staat niets gevoeligs. */
+/* IMeTech Assistent: schermen en interactie. Alle data komt van de backend; hier staat niets gevoeligs. */
+const IC = (n) => `<svg class="ic" aria-hidden="true"><use href="#${n}"></use></svg>`;
+const CAT_NAAM = { klantdeadline: "Klanten", geld: "Geld", administratie: "Administratie", intern: "Intern", prive: "Privé" };
+
 const App = {
-  tab: "vandaag",
+  tab: "assistent",
+  project: null,          // geopend project in Overzicht
   cache: {},
+  gesprek: [],            // [{rol, tekst}]
+  laatsteViaSpraak: false,
 
   init() {
-    document.querySelectorAll(".bottom-nav button").forEach(b => b.addEventListener("click", () => this.ga(b.dataset.tab)));
+    document.querySelectorAll(".bottom-nav button").forEach((b) => b.addEventListener("click", () => this.ga(b.dataset.tab)));
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").catch(e => console.warn("sw", e));
+      navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e));
       navigator.serviceWorker.addEventListener("message", (e) => {
-        if (e.data && e.data.type === "vernieuw") this.render();
-        if (e.data && e.data.type === "open_item") { this.ga("open"); }
+        if (e.data?.type === "vernieuw") this.render();
+        if (e.data?.type === "open_item") { this.project = null; this.ga("overzicht"); }
       });
     }
     this.laadThema();
-    this.installBanner();
+    Installatie.init((tab) => this.ga(tab));
+    document.getElementById("toast-knop").addEventListener("click", () => this._toastActie?.());
     const params = new URLSearchParams(location.search);
     if (params.get("tab")) this.tab = params.get("tab");
     this.ga(this.tab);
     this.checkStatus();
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { this.checkStatus(); this.render(); } });
   },
 
   ga(tab) {
     this.tab = tab;
-    document.querySelectorAll(".bottom-nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === tab));
+    document.querySelectorAll(".bottom-nav button").forEach((b) => b.classList.toggle("actief", b.dataset.tab === tab));
+    document.getElementById("kop").textContent = { assistent: "Assistent", overzicht: "Overzicht", instellingen: "Instellingen" }[tab] || "Assistent";
     this.render();
   },
 
-  toast(t, fout = false) {
-    const el = document.getElementById("toast");
-    el.textContent = t; el.className = "toast zichtbaar" + (fout ? " fout" : "");
-    clearTimeout(this._toastT); this._toastT = setTimeout(() => el.className = "toast", 3500);
+  /* ---------- toast met ongedaan maken ---------- */
+  toast(tekst, opties = {}) {
+    const el = document.getElementById("toast"), knop = document.getElementById("toast-knop");
+    document.getElementById("toast-tekst").textContent = tekst;
+    el.classList.remove("hidden"); el.classList.toggle("fout", !!opties.fout);
+    this._toastActie = opties.ongedaan || null;
+    knop.classList.toggle("hidden", !opties.ongedaan);
+    clearTimeout(this._toastT);
+    this._toastT = setTimeout(() => el.classList.add("hidden"), opties.ongedaan ? 8000 : 3500);
+    try { navigator.vibrate?.(opties.fout ? [40, 60, 40] : 25); } catch (_) {}
   },
 
   async checkStatus() {
@@ -41,10 +56,11 @@ const App = {
       if (!s.claude.oauth_token && !s.claude.api_key) problemen.push("Claude niet gekoppeld");
       if (!s.push.vapid) problemen.push("push niet ingesteld");
       el.className = "sub" + (problemen.length ? " error" : "");
-      el.textContent = problemen.length ? problemen.join(", ") : `Verbonden · ${s.open_items} open · bijgewerkt ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}`;
+      el.textContent = problemen.length ? problemen.join(", ") : `${s.open_items} open punten · bijgewerkt ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}`;
       this.cache.status = s;
+      document.getElementById("badge").textContent = s.open_items || "";
     } catch (e) {
-      el.className = "sub error"; el.textContent = "Geen verbinding: " + e.message;
+      el.className = "sub error"; el.textContent = "Geen verbinding met de assistent";
     }
   },
 
@@ -59,190 +75,268 @@ const App = {
     const logo = document.getElementById("header-logo"); if (logo) logo.src = aan ? "branding/logo-wit.png" : "branding/logo-zwart.png";
     try { localStorage.setItem("imtech-assistent-dark", aan ? "1" : "0"); } catch (_) {}
   },
-  installBanner() {
-    const banner = document.getElementById("install-banner");
-    let prompt = null;
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault(); prompt = e;
-      try { if (localStorage.getItem("imtech-assistent-install-later") === "1") return; } catch (_) {}
-      banner.classList.remove("hidden");
-    });
-    document.getElementById("btn-install").addEventListener("click", async () => { banner.classList.add("hidden"); if (prompt) { prompt.prompt(); prompt = null; } });
-    document.getElementById("btn-install-dismiss").addEventListener("click", () => { banner.classList.add("hidden"); try { localStorage.setItem("imtech-assistent-install-later", "1"); } catch (_) {} });
-  },
 
   async render() {
     const m = document.getElementById("scherm");
     try {
-      if (this.tab === "vandaag") await this.rVandaag(m);
-      else if (this.tab === "open") await this.rOpen(m);
-      else if (this.tab === "praten") await this.rPraten(m);
+      if (this.tab === "assistent") await this.rAssistent(m);
+      else if (this.tab === "overzicht") await (this.project ? this.rProject(m) : this.rOverzicht(m));
       else await this.rInstellingen(m);
     } catch (e) {
-      m.innerHTML = `<div class="card fout"><b>Kan de assistent niet bereiken</b><p>${esc(e.message)}</p><p>Controleer adres en token bij Instellingen.</p></div>`;
+      m.innerHTML = `<div class="card fout"><b>Kan de assistent niet bereiken</b><p class="stil">${esc(e.message)}</p><p class="stil">Controleer adres en token bij Instellingen.</p></div>`;
     }
   },
 
-  // ---------- Vandaag ----------
-  async rVandaag(m) {
+  /* ============================ ASSISTENT ============================ */
+  async rAssistent(m) {
     const v = await Api.vandaag();
     this.cache.vandaag = v;
     document.getElementById("badge").textContent = v.aantal_open || "";
     const ag = v.agenda, afspraken = ag.afspraken || [];
     const uren = (ag.uren_bezet || 0).toFixed(1).replace(".0", "");
+    const naam = "Ivo";
+    const uur = new Date().getHours();
+    const groet = uur < 12 ? "Goedemorgen" : uur < 18 ? "Goedemiddag" : "Goedenavond";
+    const nu = new Date().toTimeString().slice(0, 5);
+    const eerstvolgende = afspraken.find((a) => !a.hele_dag && a.van > nu);
+    const dringend = v.top.filter((i) => i.prio_score >= 80);
+    let zin = v.dag_vol ? `je dag zit vol (${uren} uur agenda)` : afspraken.length ? `${afspraken.length} afspra${afspraken.length === 1 ? "ak" : "ken"} vandaag, ${uren} uur` : "geen afspraken vandaag";
+    if (eerstvolgende) zin += `, straks ${esc(eerstvolgende.titel)} om ${eerstvolgende.van}`;
+    zin += ". " + (dringend.length ? `${dringend.length} ${dringend.length === 1 ? "punt vraagt" : "punten vragen"} aandacht.` : v.aantal_open ? `${v.aantal_open} open punten, niets dringends.` : "Niets open.");
+
     m.innerHTML = `
-      <section class="card">
-        <div class="kop"><b>${datumNl(v.datum)}</b><span class="tag ${v.dag_vol ? "rood" : "groen"}">${v.dag_vol ? "dag zit vol" : uren + " uur bezet"}</span></div>
-        ${afspraken.length ? `<ul class="agenda">${afspraken.map(a => `<li><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span> ${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}</li>`).join("")}</ul>` : `<p class="stil">Geen afspraken vandaag.</p>`}
-        ${(v.morgen.afspraken || []).length ? `<p class="stil">Morgen: ${v.morgen.afspraken.length} afspraken, ${(v.morgen.uren_bezet || 0).toFixed(1).replace(".0", "")} uur.</p>` : ""}
+      <section class="card groet">
+        <div class="groet-kop">${IC("ic-assistent")}<b>${groet}, ${naam}.</b></div>
+        <p>${zin}</p>
+        ${afspraken.length ? `<ul class="agenda">${afspraken.map((a) => `<li><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span><span>${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}</span></li>`).join("")}</ul>` : ""}
       </section>
-      <h2>Nu belangrijk</h2>
-      ${v.top.length ? v.top.map(it => this.itemKaart(it)).join("") : `<p class="stil">Niets dringends. ${v.aantal_open ? v.aantal_open + " open punten in het tabblad Open." : ""}</p>`}
-      ${v.uren && v.uren.ontbrekend && v.uren.ontbrekend.length ? `<p class="stil">Uren nog niet ingevuld: ${v.uren.ontbrekend.map(datumKort).join(", ")}</p>` : ""}
-      ${v.laatste_meldingen.length ? `<h2>Laatste meldingen</h2>${v.laatste_meldingen.map(n => `<div class="melding"><b>${esc(n.titel)}</b><div>${esc(n.body).replace(/\n/g, "<br>")}</div><small>${tijdNl(n.verstuurd_at)}</small></div>`).join("")}` : ""}
-    `;
-    this.bindActies(m);
+      ${v.top.length ? `<h2>Nu belangrijk</h2><div id="top">${v.top.slice(0, 3).map((it) => this.itemRij(it)).join("")}</div>
+        <button type="button" class="btn-link" id="naar-overzicht">Alle ${v.aantal_open} open punten ${IC("ic-chevron")}</button>` : ""}
+      <h2>Vraag of zeg iets</h2>
+      <div class="chips">
+        <button type="button" class="chip" data-vraag="Wat moet ik vandaag echt niet vergeten?">Wat niet vergeten?</button>
+        <button type="button" class="chip" data-vraag="Wat staat er open voor klanten?">Open voor klanten</button>
+        <button type="button" class="chip" data-vraag="Welke facturen staan nog open?">Facturen</button>
+        <button type="button" class="chip" data-vraag="Hoe ziet morgen eruit?">Morgen</button>
+      </div>
+      <div id="gesprek" class="gesprek">${this.gesprek.map((b) => this.belHtml(b)).join("")}</div>
+      <p id="dicteer-hint" class="hint hidden"></p>
+      <div class="invoer-balk">
+        <button type="button" id="btn-dicteer" class="btn-rond" aria-pressed="false" aria-label="Inspreken" title="Inspreken">${IC("ic-mic")}</button>
+        <input id="vraag-tekst" placeholder="Typ of spreek in…" autocomplete="off" enterkeyhint="send" />
+        <button type="button" id="btn-stuur" class="btn-rond btn-rond-primair" aria-label="Versturen">${IC("ic-versturen")}</button>
+      </div>`;
+    this.bindItems(m);
+    m.querySelector("#naar-overzicht")?.addEventListener("click", () => { this.project = null; this.ga("overzicht"); });
+    m.querySelectorAll(".chip[data-vraag]").forEach((c) => c.addEventListener("click", () => this.stuur(c.dataset.vraag, false)));
+    const input = m.querySelector("#vraag-tekst");
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.stuur(input.value, false); } });
+    m.querySelector("#btn-stuur").addEventListener("click", () => this.stuur(input.value, false));
+    m.querySelector("#btn-dicteer").addEventListener("click", () => this.dicteer(m.querySelector("#btn-dicteer"), input));
+    if (this.gesprek.length) this.scrollGesprek();
   },
 
-  itemKaart(it, uitgebreid = false) {
-    const due = it.due_at ? `<span class="tag ${dueKleur(it.due_at)}">${datumKort(it.due_at)}</span>` : "";
-    return `<div class="item" data-id="${it.id}">
-      <div class="itemkop">
-        <span class="prio p${Math.min(4, Math.floor((it.prio_score || 0) / 25))}" title="prio ${it.prio_score}"></span>
-        <div class="tekst"><b>${esc(it.titel)}</b>
-          <div class="sub">${it.project ? esc(it.project) + " · " : ""}${esc(it.categorie)}${it.prio_reden ? " · " + esc(it.prio_reden) : ""} ${due}</div>
-          ${uitgebreid && it.omschrijving ? `<div class="omschr">${esc(it.omschrijving)}</div>` : ""}
-          ${uitgebreid && it.meta && it.meta.link ? `<a href="${esc(it.meta.link)}" target="_blank" rel="noopener">open in Outlook</a>` : ""}
-        </div>
+  belHtml(b) {
+    return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map((a) => `<span class="tag groen">${IC("ic-vink")} ${esc(a.titel)}</span>`).join("")}</div>` : ""}</div>`;
+  },
+  scrollGesprek() { const g = document.getElementById("gesprek"); if (g) g.lastElementChild?.scrollIntoView({ block: "nearest" }); },
+
+  dicteer(knop, veld) {
+    if (Spraak.luistert()) { Spraak.stop(); return; }
+    Spraak.stil();
+    const hint = document.getElementById("dicteer-hint");
+    let laatste = "";
+    const gestart = Spraak.start({
+      onTekst(volledig) { veld.value = volledig; laatste = volledig; },
+      onTussentijds(voorlopig) { hint.textContent = voorlopig ? "… " + voorlopig : ""; hint.classList.toggle("hidden", !voorlopig); },
+      onFout: (msg) => this.toast(msg, { fout: true }),
+      onEinde: () => {
+        knop.setAttribute("aria-pressed", "false"); knop.title = "Inspreken"; hint.classList.add("hidden");
+        if (laatste.trim()) this.stuur(laatste, true);   // klaar met praten: meteen versturen en antwoord voorlezen
+      },
+    });
+    if (gestart) { knop.setAttribute("aria-pressed", "true"); knop.title = "Stoppen"; this.toast("Ik luister… tik nog eens om te stoppen"); }
+  },
+
+  async stuur(tekst, viaSpraak) {
+    tekst = (tekst || "").trim();
+    if (!tekst) return;
+    const input = document.getElementById("vraag-tekst"); if (input) input.value = "";
+    this.gesprek.push({ rol: "user", tekst });
+    const wacht = { rol: "assistant", tekst: "Even kijken…", wacht: true };
+    this.gesprek.push(wacht);
+    const g = document.getElementById("gesprek"); if (g) { g.innerHTML = this.gesprek.map((b) => this.belHtml(b)).join(""); this.scrollGesprek(); }
+    const t0 = Date.now();
+    try {
+      const r = await Api.chat(tekst);
+      Object.assign(wacht, { tekst: r.antwoord, wacht: false, acties: r.acties });
+      const inst = await Opslag.instellingen();
+      if (viaSpraak || inst.stem !== false) Spraak.spreek(r.antwoord, inst.stemNaam);
+      if (r.acties?.length) this.checkStatus();
+    } catch (e) {
+      Object.assign(wacht, { tekst: "Dat lukte even niet: " + e.message, wacht: false, fout: true });
+    }
+    if (this.gesprek.length > 30) this.gesprek = this.gesprek.slice(-30);
+    if (this.tab === "assistent") { const g2 = document.getElementById("gesprek"); if (g2) { g2.innerHTML = this.gesprek.map((b) => this.belHtml(b)).join(""); this.scrollGesprek(); } }
+    console.debug("antwoord in", Date.now() - t0, "ms");
+  },
+
+  /* ============================ OVERZICHT ============================ */
+  groepeer(items) {
+    const groepen = new Map();
+    for (const it of items) {
+      const sleutel = it.project && it.categorie !== "geld" ? it.project : (CAT_NAAM[it.categorie] || "Overig");
+      if (!groepen.has(sleutel)) groepen.set(sleutel, { naam: sleutel, items: [], max: 0, due: null, isProject: !!it.project && it.categorie !== "geld" });
+      const g = groepen.get(sleutel);
+      g.items.push(it); g.max = Math.max(g.max, it.prio_score || 0);
+      if (it.due_at && (!g.due || it.due_at < g.due)) g.due = it.due_at;
+    }
+    return [...groepen.values()].sort((a, b) => b.max - a.max || a.naam.localeCompare(b.naam));
+  },
+
+  async rOverzicht(m) {
+    const filter = this.cache.filter || "open";
+    const d = await Api.items(filter === "open" ? "open" : filter === "later" ? "snoozed" : "done,dismissed");
+    if (filter === "open") document.getElementById("badge").textContent = d.items.length || "";
+    const groepen = this.groepeer(d.items);
+    m.innerHTML = `
+      <div class="chips">
+        ${[["open", "Open"], ["later", "Uitgesteld"], ["klaar", "Afgerond"]].map(([f, l]) => `<button type="button" class="chip ${filter === f ? "actief" : ""}" data-filter="${f}">${l}</button>`).join("")}
       </div>
-      <div class="acties">
-        <button data-actie="done">Gedaan</button>
-        <button data-actie="snooze" data-tot="morgen">Morgen</button>
-        <button data-actie="snooze" data-tot="volgende_week">Volgende week</button>
-        <button data-actie="dismiss" class="zacht">Negeer</button>
+      ${filter === "open" ? `<form id="nieuw" class="nieuw"><input name="titel" placeholder="Nieuw punt, bijv. 'WBSO afmaken voor 30 sept'" autocomplete="off" enterkeyhint="done"><button type="submit" class="btn-primary" aria-label="Toevoegen">+</button></form>` : ""}
+      ${groepen.length ? groepen.map((g) => `
+        <button type="button" class="groep" data-groep="${esc(g.naam)}">
+          <span class="prio p${prioKlasse(g.max)}"></span>
+          <span class="groep-tekst"><b>${esc(g.naam)}</b><span class="sub">${g.items.length} ${g.items.length === 1 ? "punt" : "punten"}${g.due ? " · eerste deadline " + datumKort(g.due) : ""}</span></span>
+          ${IC("ic-chevron")}
+        </button>`).join("") : `<p class="stil leeg">${filter === "open" ? "Niets open. Lekker." : "Niets hier."}</p>`}`;
+    m.querySelectorAll(".chip[data-filter]").forEach((c) => c.addEventListener("click", () => { this.cache.filter = c.dataset.filter; this.render(); }));
+    m.querySelectorAll(".groep").forEach((k) => k.addEventListener("click", () => { this.project = k.dataset.groep; this.render(); }));
+    m.querySelector("#nieuw")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const t = e.target.titel.value.trim(); if (!t) return;
+      try { const r = await Api.chat("Nieuw punt: " + t); this.toast(r.antwoord || "Toegevoegd"); e.target.reset(); this.render(); } catch (err) { this.toast(err.message, { fout: true }); }
+    });
+  },
+
+  async rProject(m) {
+    const filter = this.cache.filter || "open";
+    const d = await Api.items(filter === "open" ? "open" : filter === "later" ? "snoozed" : "done,dismissed");
+    const groep = this.groepeer(d.items).find((g) => g.naam === this.project);
+    const items = (groep?.items || []).sort((a, b) => (b.prio_score || 0) - (a.prio_score || 0) || (a.due_at || "9999").localeCompare(b.due_at || "9999"));
+    m.innerHTML = `
+      <button type="button" class="btn-link terug" id="terug">${IC("ic-terug")} Overzicht</button>
+      <h2>${esc(this.project)} · ${items.length}</h2>
+      ${items.length ? items.map((it) => this.itemRij(it, filter !== "open")).join("") : `<p class="stil leeg">Niets meer hier.</p>`}`;
+    m.querySelector("#terug").addEventListener("click", () => { this.project = null; this.render(); });
+    this.bindItems(m);
+    if (!items.length) setTimeout(() => { this.project = null; this.render(); }, 600);
+  },
+
+  /* ---------- itemrij: tik om open te klappen, dan de acties ---------- */
+  itemRij(it, afgehandeld = false) {
+    const due = it.due_at ? `<span class="tag ${dueKleur(it.due_at)}">${datumKort(it.due_at)}</span>` : "";
+    const bron = { boekhouding: "boekhouding", outlook_mail: "mail", projectdoc: "projectlogboek", uren: "uren", claude: "Claude-sessie", plaud: "opname", google_agenda: "agenda", outlook_agenda: "agenda", handmatig: "zelf toegevoegd" }[it.bron] || it.bron;
+    return `<div class="item" data-id="${it.id}">
+      <button type="button" class="item-kop" aria-expanded="false">
+        <span class="prio p${prioKlasse(it.prio_score)}"></span>
+        <span class="tekst"><span class="titel">${esc(it.titel)}</span><span class="sub">${it.project ? esc(it.project) + " · " : ""}${bron}${it.prio_reden ? " · " + esc(it.prio_reden) : ""}</span></span>
+        ${due}
+      </button>
+      <div class="item-body hidden">
+        ${it.omschrijving ? `<p class="omschr">${esc(it.omschrijving)}</p>` : ""}
+        ${it.meta?.link ? `<a href="${esc(it.meta.link)}" target="_blank" rel="noopener">Open in Outlook</a>` : ""}
+        ${it.meta?.auto ? `<p class="stil">Automatisch: ${esc(it.meta.auto)}</p>` : ""}
+        <div class="acties">
+          ${afgehandeld ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Terugzetten</button>` : `
+          <button type="button" data-actie="done" class="goed">${IC("ic-vink")} Gedaan</button>
+          <button type="button" data-actie="snooze" data-tot="morgen">${IC("ic-klok")} Morgen</button>
+          <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>
+          <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>`}
+        </div>
       </div>
     </div>`;
   },
 
-  bindActies(root) {
-    root.querySelectorAll(".item .acties button").forEach(b => b.addEventListener("click", async () => {
-      const kaart = b.closest(".item"), id = kaart.dataset.id;
+  bindItems(root) {
+    root.querySelectorAll(".item-kop").forEach((k) => k.addEventListener("click", () => {
+      const open = k.getAttribute("aria-expanded") === "true";
+      root.querySelectorAll(".item-kop[aria-expanded=true]").forEach((x) => { x.setAttribute("aria-expanded", "false"); x.nextElementSibling.classList.add("hidden"); });
+      if (!open) { k.setAttribute("aria-expanded", "true"); k.nextElementSibling.classList.remove("hidden"); }
+    }));
+    root.querySelectorAll(".item .acties button").forEach((b) => b.addEventListener("click", async () => {
+      const kaart = b.closest(".item"), id = kaart.dataset.id, actie = b.dataset.actie;
+      const titel = kaart.querySelector(".titel").textContent;
       kaart.classList.add("weg");
       try {
-        await Api.actie(id, b.dataset.actie, { tot: b.dataset.tot });
-        this.toast({ done: "Afgevinkt", snooze: "Uitgesteld", dismiss: "Genegeerd" }[b.dataset.actie]);
-        setTimeout(() => this.render(), 350);
-      } catch (e) { kaart.classList.remove("weg"); this.toast(e.message, true); }
+        await Api.actie(id, actie, { tot: b.dataset.tot });
+        const tekst = { done: "Afgevinkt", snooze: b.dataset.tot === "morgen" ? "Tot morgen uitgesteld" : "Tot volgende week uitgesteld", dismiss: "Als niet relevant gemarkeerd", reopen: "Teruggezet" }[actie];
+        this.toast(`${tekst}: ${titel.slice(0, 40)}${titel.length > 40 ? "…" : ""}`, actie === "reopen" ? {} : {
+          ongedaan: async () => { try { await Api.actie(id, "reopen"); this.toast("Teruggezet"); this.render(); this.checkStatus(); } catch (e) { this.toast(e.message, { fout: true }); } },
+        });
+        setTimeout(() => { kaart.remove(); this.checkStatus(); if (!root.querySelector(".item")) this.render(); }, 300);
+      } catch (e) { kaart.classList.remove("weg"); this.toast(e.message, { fout: true }); }
     }));
   },
 
-  // ---------- Open ----------
-  async rOpen(m) {
-    const filter = this.cache.filter || "open";
-    const d = await Api.items(filter === "open" ? "open" : filter === "later" ? "snoozed" : "done,dismissed");
-    document.getElementById("badge").textContent = filter === "open" ? (d.items.length || "") : document.getElementById("badge").textContent;
-    const projecten = [...new Set(d.items.map(i => i.project).filter(Boolean))].sort();
-    const pf = this.cache.project || "";
-    const items = pf ? d.items.filter(i => i.project === pf) : d.items;
-    m.innerHTML = `
-      <div class="filters">
-        ${["open", "later", "klaar"].map(f => `<button class="chip ${filter === f ? "actief" : ""}" data-filter="${f}">${f}</button>`).join("")}
-        ${projecten.length ? `<select id="projectfilter"><option value="">alle projecten</option>${projecten.map(p => `<option ${p === pf ? "selected" : ""}>${esc(p)}</option>`).join("")}</select>` : ""}
-      </div>
-      <form id="nieuw" class="nieuw"><input name="titel" placeholder="Nieuw punt, bijv. 'WBSO aanvraag afmaken 30 sept'" autocomplete="off"><button>+</button></form>
-      ${items.length ? items.map(it => this.itemKaart(it, true)).join("") : `<p class="stil">Niets hier.</p>`}
-    `;
-    m.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => { this.cache.filter = c.dataset.filter; this.render(); }));
-    const sel = m.querySelector("#projectfilter");
-    if (sel) sel.addEventListener("change", () => { this.cache.project = sel.value; this.render(); });
-    m.querySelector("#nieuw").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const t = e.target.titel.value.trim();
-      if (!t) return;
-      try {
-        // Vrije tekst gaat via chat zodat Claude datum en categorie eruit haalt
-        const r = await Api.chat("Nieuw punt: " + t);
-        this.toast(r.antwoord || "Toegevoegd");
-        e.target.reset(); this.render();
-      } catch (err) { this.toast(err.message, true); }
-    });
-    this.bindActies(m);
-  },
-
-  // ---------- Praten ----------
-  async rPraten(m) {
-    const g = await Api.chatGeschiedenis().catch(() => ({ berichten: [] }));
-    m.innerHTML = `
-      <div id="gesprek" class="gesprek">${g.berichten.map(b => `<div class="bel ${b.rol}">${esc(b.tekst)}</div>`).join("") || `<p class="stil">Vraag iets ("wat staat er open bij uMotion?") of geef iets door ("de offerte is verstuurd").</p>`}</div>
-      <form id="vraag" class="vraagbalk">
-        <button type="button" id="mic" class="mic" title="inspreken" aria-label="Inspreken">🎤</button>
-        <input name="tekst" placeholder="Typ of spreek in…" autocomplete="off">
-        <button>Stuur</button>
-      </form>`;
-    const gesprek = m.querySelector("#gesprek"); gesprek.scrollTop = gesprek.scrollHeight;
-    const form = m.querySelector("#vraag"), input = form.tekst, mic = m.querySelector("#mic");
-    const stuur = async (tekst) => {
-      if (!tekst) return;
-      gesprek.insertAdjacentHTML("beforeend", `<div class="bel user">${esc(tekst)}</div><div class="bel assistant wacht">…</div>`);
-      gesprek.scrollTop = gesprek.scrollHeight; input.value = "";
-      try {
-        const r = await Api.chat(tekst);
-        gesprek.lastElementChild.outerHTML = `<div class="bel assistant">${esc(r.antwoord)}${r.acties.length ? `<div class="sub">${r.acties.map(a => esc(a.actie + ": " + a.titel)).join("<br>")}</div>` : ""}</div>`;
-        const inst = await Opslag.instellingen();
-        if (inst.stem !== false) Spraak.zeg(r.antwoord);
-      } catch (e) { gesprek.lastElementChild.outerHTML = `<div class="bel assistant fout">${esc(e.message)}</div>`; }
-      gesprek.scrollTop = gesprek.scrollHeight;
-    };
-    form.addEventListener("submit", (e) => { e.preventDefault(); stuur(input.value.trim()); });
-    if (!Spraak.kanLuisteren()) mic.disabled = true;
-    mic.addEventListener("click", () => {
-      if (mic.classList.contains("aan")) { Spraak.stop(); return; }
-      Spraak.stil(); mic.classList.add("aan");
-      Spraak.luister((t) => { input.value = t; }, (eind) => { mic.classList.remove("aan"); if (eind) stuur(eind); }, (f) => { mic.classList.remove("aan"); this.toast("Spraak: " + f, true); });
-    });
-  },
-
-  // ---------- Instellingen ----------
+  /* ============================ INSTELLINGEN ============================ */
   async rInstellingen(m) {
     const c = await Opslag.instellingen();
     const s = this.cache.status;
-    const perm = ("Notification" in window) ? Notification.permission : "n.v.t.";
+    const perm = "Notification" in window ? { granted: "toegestaan", denied: "geweigerd", default: "nog niet gevraagd" }[Notification.permission] : "niet beschikbaar";
+    const stemmen = Spraak.stemmen();
     m.innerHTML = `
       <form id="inst" class="card">
-        <label>Adres van de assistent<input name="adres" value="${esc(c.adres)}" placeholder="https://assistant.imetech.nl" inputmode="url"></label>
+        <h2>Verbinding</h2>
+        <label>Adres van de assistent<input name="adres" value="${esc(c.adres)}" placeholder="https://assistant.imetech.nl" inputmode="url" autocapitalize="off"></label>
         <label>Token<input name="token" value="${esc(c.token)}" type="password" autocomplete="off"></label>
-        <label class="check-row"><input type="checkbox" name="stem" ${c.stem !== false ? "checked" : ""}> Antwoorden voorlezen</label>
-        <label class="check-row"><input type="checkbox" id="toggle-dark-mode" ${document.documentElement.dataset.theme === "dark" ? "checked" : ""}> Donkere modus</label>
-        <div class="rij"><button class="btn-primary">Opslaan en testen</button></div>
+        <div class="rij"><button type="submit" class="btn-primary">Opslaan en testen</button></div>
       </form>
       <section class="card">
-        <b>Meldingen</b>
-        <p class="stil">Toestemming: ${perm}. ${s ? `Push op server: ${s.push.vapid ? "ingesteld" : "niet ingesteld"}, ${s.push.abonnementen} apparaat/apparaten.` : ""}</p>
-        <div class="rij"><button id="abonneer" class="btn-primary">Meldingen aanzetten op dit toestel</button><button id="pushtest" class="zacht">Testmelding</button></div>
+        <h2>Meldingen</h2>
+        <p class="stil">Toestemming: ${perm}.${s ? ` Server: ${s.push.vapid ? "klaar" : "niet ingesteld"}, ${s.push.abonnementen} toestel(len).` : ""}</p>
+        <div class="rij"><button type="button" id="abonneer" class="btn-primary">Meldingen aanzetten op dit toestel</button><button type="button" id="pushtest" class="btn-secondary">Testmelding</button></div>
       </section>
       <section class="card">
-        <b>Status</b>
+        <h2>Spraak</h2>
+        <label class="check-row"><input type="checkbox" name="stem" id="stem-aan" ${c.stem !== false ? "checked" : ""}> Antwoorden altijd voorlezen (bij inspreken altijd)</label>
+        ${stemmen.length ? `<label>Stem<select id="stem-naam">${stemmen.map((v) => `<option value="${esc(v.name)}" ${v.name === c.stemNaam ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>` : ""}
+        <div class="rij"><button type="button" id="stem-test" class="btn-secondary">${IC("ic-luidspreker")} Test</button></div>
+      </section>
+      <section class="card">
+        <h2>Weergave</h2>
+        <label class="check-row"><input type="checkbox" id="toggle-dark-mode" ${document.documentElement.dataset.theme === "dark" ? "checked" : ""}> Donkere modus</label>
+        <div id="install-manual" class="hint hidden">Installeren: open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</div>
+        <div class="rij"><button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button></div>
+      </section>
+      <section class="card">
+        <h2>Status</h2>
         ${s ? `<ul class="status-lijst">
-          <li>Microsoft (agenda, mail, OneDrive): ${s.graph_gekoppeld ? "gekoppeld" : "niet gekoppeld"}</li>
-          <li>Claude: ${s.claude.oauth_token ? "abonnement" : s.claude.api_key ? "API-key" : "niet gekoppeld"}${s.claude.cli ? "" : " (CLI ontbreekt)"}</li>
+          <li>Microsoft (mail, agenda, OneDrive): ${s.graph_gekoppeld ? "gekoppeld" : "niet gekoppeld"}</li>
+          <li>Claude: ${s.claude.oauth_token ? "abonnement" : s.claude.api_key ? "API-key" : "niet gekoppeld"}</li>
           <li>Laatste verzamelronde: ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}</li>
-          <li>Laatste triage (met Claude): ${s.scheduler.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet"}</li>
-          ${s.scheduler.fouten.length ? `<li class="fout">Fouten: ${s.scheduler.fouten.map(esc).join("; ")}</li>` : ""}
+          <li>Laatste triage met Claude: ${s.scheduler.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet"}</li>
+          ${s.scheduler.fouten?.length ? `<li class="fout">Fouten: ${s.scheduler.fouten.map(esc).join("; ")}</li>` : ""}
         </ul>` : `<p class="stil">Nog geen verbinding.</p>`}
-        <div class="rij"><button id="verzamel" class="zacht">Nu verzamelen</button><button id="triage" class="zacht">Verzamelen + triage</button><button id="briefing" class="zacht">Ochtendbriefing nu</button></div>
+        <div class="rij"><button type="button" id="verzamel" class="btn-secondary">Nu verzamelen</button><button type="button" id="triage" class="btn-secondary">Verzamelen + triage</button><button type="button" id="briefing" class="btn-secondary">Briefing nu</button></div>
       </section>`;
     m.querySelector("#inst").addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = e.target;
-      await Opslag.set("instellingen", { adres: f.adres.value.trim(), token: f.token.value.trim(), stem: f.stem.checked });
-      try { await Api.status(); this.toast("Verbonden"); await this.checkStatus(); this.render(); } catch (err) { this.toast(err.message, true); }
+      await Opslag.set("instellingen", { ...c, adres: f.adres.value.trim(), token: f.token.value.trim() });
+      try { await Api.status(); this.toast("Verbonden"); await this.checkStatus(); this.render(); } catch (err) { this.toast(err.message, { fout: true }); }
     });
+    const bewaar = async (patch) => Opslag.set("instellingen", { ...(await Opslag.instellingen()), ...patch });
+    m.querySelector("#stem-aan").addEventListener("change", (e) => bewaar({ stem: e.target.checked }));
+    m.querySelector("#stem-naam")?.addEventListener("change", (e) => bewaar({ stemNaam: e.target.value }));
+    m.querySelector("#stem-test").addEventListener("click", async () => { const i = await Opslag.instellingen(); Spraak.spreek("Hoi Ivo, ik ben je assistent. Zo klink ik.", i.stemNaam); });
     m.querySelector("#toggle-dark-mode").addEventListener("change", (e) => this.zetThema(e.target.checked));
+    m.querySelector("#btn-install-settings").addEventListener("click", () => Installatie.promptInstall());
     m.querySelector("#abonneer").addEventListener("click", () => this.abonneer());
-    m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, true); } });
-    m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} direct, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, true); } });
-    m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een minuut duren…"); try { const r = await Api.verzamel(true); this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${r.update || 0} bijgewerkt, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, true); } });
-    m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing("ochtend"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, true); } });
+    m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, { fout: true }); } });
+    m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} bijgewerkt, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
+    m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${r.dubbel || 0} dubbel, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
+    m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },
 
   async abonneer() {
@@ -258,15 +352,16 @@ const App = {
       await Api.abonneer(sub.toJSON(), navigator.userAgent.slice(0, 80));
       this.toast("Meldingen staan aan");
       await this.checkStatus(); this.render();
-    } catch (e) { this.toast(e.message, true); }
+    } catch (e) { this.toast(e.message, { fout: true }); }
   },
 };
 
-function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-function datumNl(iso) { const d = new Date(iso + "T12:00:00"); return d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" }); }
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function prioKlasse(p) { return Math.min(4, Math.floor((p || 0) / 25)); }
 function datumKort(iso) { const d = new Date(iso.slice(0, 10) + "T12:00:00"); return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }); }
 function tijdNl(iso) { const d = new Date(iso); return d.toLocaleString("nl-NL", { weekday: "short", hour: "2-digit", minute: "2-digit" }); }
 function dueKleur(iso) { const dagen = Math.round((new Date(iso.slice(0, 10)) - new Date(new Date().toDateString())) / 864e5); return dagen < 0 ? "rood" : dagen <= 2 ? "oranje" : "grijs"; }
-function b64ToU8(b64) { const p = "=".repeat((4 - b64.length % 4) % 4); const s = atob((b64 + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, c => c.charCodeAt(0)); }
+function b64ToU8(b64) { const p = "=".repeat((4 - (b64.length % 4)) % 4); const s = atob((b64 + p).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(s, (c) => c.charCodeAt(0)); }
 
 window.addEventListener("DOMContentLoaded", () => App.init());
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};

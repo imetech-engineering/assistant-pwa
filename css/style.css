@@ -64,10 +64,12 @@ body { display: flex; flex-direction: column; height: 100%; height: 100dvh; over
 .app-header .sub.error { color: var(--danger); }
 .header-logo { position: absolute; top: calc(12px + var(--safe-top)); right: 16px; display: block; height: 28px; width: auto; max-width: 120px; object-fit: contain; }
 
-/* Installatiebanner */
-.install-banner { flex-shrink: 0; background: var(--accent-light); border-bottom: 1px solid var(--border); padding: 10px 16px; font-size: 0.875rem; }
-.install-banner p { margin: 0 0 8px; }
+/* Installatiebanner (zoals projectdoc-pwa: zwevende kaart boven de navigatie) */
+.install-banner { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px); z-index: 55; padding: 14px; background: var(--bg-primary); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); box-shadow: 0 6px 24px rgba(0,0,0,.16); }
+.install-banner p { margin: 0 0 10px; font-size: 0.875rem; }
 .install-banner-actions { display: flex; gap: 8px; }
+.install-banner-actions > * { flex: 1; }
+.hint { font-size: 0.8125rem; color: var(--text-secondary); margin: 6px 0; }
 .hidden { display: none !important; }
 
 main {
@@ -166,10 +168,71 @@ label input:not([type=checkbox]) { margin-top: 4px; }
 .badge:empty { display: none; }
 
 /* Toast */
+/* (basis) */
 .toast {
   position: fixed; left: 16px; right: 16px; bottom: calc(var(--nav-h) + var(--safe-bottom) + 12px);
   padding: 12px 14px; background: var(--text-primary); color: var(--bg-primary); border-radius: var(--radius-md);
-  font-size: 0.875rem; z-index: 40; box-shadow: 0 4px 20px rgba(0,0,0,.15); opacity: 0; transform: translateY(10px); transition: .25s; pointer-events: none;
+  font-size: 0.875rem; z-index: 40; box-shadow: 0 4px 20px rgba(0,0,0,.15);
 }
-.toast.zichtbaar { opacity: 1; transform: none; }
 .toast.fout { background: var(--danger); color: #fff; }
+
+
+/* Iconen */
+.ic-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ic { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bottom-nav .ic { width: 22px; height: 22px; }
+.bottom-nav button { flex-direction: column; gap: 3px; padding: 6px 4px; }
+.bottom-nav .badge { position: absolute; margin-left: 44px; margin-top: -30px; }
+.bottom-nav button { position: relative; }
+
+/* Ronde knoppen (inspreken/versturen), zoals projectdoc-pwa */
+.btn-rond { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--touch); height: var(--touch); padding: 0; color: var(--text-secondary); background: var(--bg-primary); border: 1px solid var(--border-strong); border-radius: 50%; cursor: pointer; }
+.btn-rond:active { background: var(--bg-hover); }
+.btn-rond[aria-pressed="true"] { color: #fff; background: var(--danger); border-color: var(--danger); animation: pulseer 1.1s ease-in-out infinite; }
+.btn-rond-primair { color: #fff; background: var(--accent); border-color: var(--accent); }
+@keyframes pulseer { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.invoer-balk { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: center; padding: 10px 0 8px; background: var(--bg-secondary); }
+.invoer-balk input { flex: 1; min-width: 0; }
+
+/* Assistent-scherm */
+.groet { border-left: 3px solid var(--accent); }
+.groet-kop { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 1.0625rem; }
+.groet-kop .ic { color: var(--accent); }
+.groet p { margin: 0 0 6px; line-height: 1.45; }
+.btn-link { background: none; color: var(--accent); padding: 8px 4px; min-height: 36px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; }
+.btn-link.terug { margin: 2px 0 0 -4px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.bel-acties { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+.bel-acties .tag { display: inline-flex; align-items: center; gap: 4px; }
+.bel-acties .ic { width: 14px; height: 14px; }
+.bel.wacht::after { content: ""; display: inline-block; width: 1em; animation: puntjes 1.2s steps(4) infinite; }
+@keyframes puntjes { to { content: "…"; } }
+.gesprek { min-height: 0; }
+
+/* Overzicht: groepen */
+.groep { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; margin-bottom: 8px; font-weight: 400; }
+.groep:active { background: var(--bg-hover); }
+.groep .prio { margin-top: 0; }
+.groep-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.groep-tekst b { font-weight: 600; }
+.groep .ic { color: var(--text-tertiary); }
+.leeg { text-align: center; padding: 30px 0; }
+
+/* Item: kop is een knop, body klapt open */
+.item { padding: 0; overflow: hidden; }
+.item-kop { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; background: none; padding: 12px 14px; border-radius: 0; font-weight: 400; min-height: var(--touch); }
+.item-kop .titel { display: block; font-weight: 600; line-height: 1.3; }
+.item-kop .prio { margin-top: 6px; }
+.item-kop .tag { margin-top: 2px; }
+.item-kop[aria-expanded="true"] { background: var(--bg-hover); }
+.item-body { padding: 4px 14px 12px; border-top: 1px solid var(--border); }
+.item-body .omschr { margin: 8px 0; }
+.acties button { display: inline-flex; align-items: center; gap: 6px; }
+.acties button.goed { background: var(--goed-light); color: var(--goed); }
+.acties .ic { width: 16px; height: 16px; }
+
+/* Toast met knop */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-knop { background: rgba(255,255,255,.15); color: #fff; padding: 6px 12px; min-height: 32px; min-width: 0; font-weight: 600; margin-left: auto; white-space: nowrap; flex-shrink: 0; border-radius: 6px; }
+html[data-theme="dark"] .toast-knop { color: var(--bg-primary); }
+.toast.fout .toast-knop { color: #fff; }
