@@ -1,0 +1,20 @@
+# Geheimen en data: nooit in git
+backend/.env
+backend/config.yaml
+backend/data/
+*.sqlite3
+*.sqlite3-*
+graph_token.json
+mail-token.json
+tokens.json
+
+# Python / Node
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
