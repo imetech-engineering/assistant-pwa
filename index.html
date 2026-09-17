@@ -1,35 +1,48 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="nl">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f766e">
-  <title>IMeTech Assistant</title>
-  <link rel="manifest" href="manifest.json">
-  <link rel="icon" href="icons/icon-192.png">
-  <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
-  <header class="top">
-    <div class="titel">IMeTech Assistent</div>
-    <div id="status" class="status" title="verbinding"></div>
-  </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2563EB" id="meta-theme-color" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>IMeTech Assistent</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  </head>
+  <body>
+    <div id="install-banner" class="install-banner hidden" role="dialog" aria-label="App installeren">
+      <p><strong>Installeer IMeTech Assistent</strong> op je startscherm voor meldingen en snelle toegang.</p>
+      <div class="install-banner-actions">
+        <button type="button" id="btn-install" class="btn-primary">Installeren</button>
+        <button type="button" id="btn-install-dismiss" class="btn-secondary">Later</button>
+      </div>
+    </div>
 
-  <main id="scherm"></main>
+    <header class="app-header">
+      <div class="header-text">
+        <h1>Assistent</h1>
+        <p id="status" class="sub">—</p>
+      </div>
+      <img id="header-logo" class="header-logo" src="branding/logo-zwart.png" alt="IMeTech Engineering" width="120" height="28" />
+    </header>
 
-  <nav class="tabs">
-    <button data-tab="vandaag" class="actief">Vandaag</button>
-    <button data-tab="open">Open <span id="badge" class="badge"></span></button>
-    <button data-tab="praten">Praten</button>
-    <button data-tab="instellingen">Instellingen</button>
-  </nav>
+    <main id="scherm"></main>
 
-  <div id="toast" class="toast"></div>
+    <nav class="bottom-nav" aria-label="Hoofdnavigatie">
+      <button type="button" data-tab="vandaag" class="actief">Vandaag</button>
+      <button type="button" data-tab="open">Open <span id="badge" class="badge"></span></button>
+      <button type="button" data-tab="praten">Praten</button>
+      <button type="button" data-tab="instellingen">Instellingen</button>
+    </nav>
 
-  <script src="js/opslag.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/spraak.js"></script>
-  <script src="js/app.js"></script>
-</body>
+    <div id="toast" class="toast" role="status"></div>
+
+    <script src="js/opslag.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/spraak.js"></script>
+    <script src="js/app.js"></script>
+  </body>
 </html>

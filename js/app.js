@@ -4,7 +4,7 @@ const App = {
   cache: {},
 
   init() {
-    document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => this.ga(b.dataset.tab)));
+    document.querySelectorAll(".bottom-nav button").forEach(b => b.addEventListener("click", () => this.ga(b.dataset.tab)));
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch(e => console.warn("sw", e));
       navigator.serviceWorker.addEventListener("message", (e) => {
@@ -12,6 +12,8 @@ const App = {
         if (e.data && e.data.type === "open_item") { this.ga("open"); }
       });
     }
+    this.laadThema();
+    this.installBanner();
     const params = new URLSearchParams(location.search);
     if (params.get("tab")) this.tab = params.get("tab");
     this.ga(this.tab);
@@ -20,7 +22,7 @@ const App = {
 
   ga(tab) {
     this.tab = tab;
-    document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("actief", b.dataset.tab === tab));
+    document.querySelectorAll(".bottom-nav button").forEach(b => b.classList.toggle("actief", b.dataset.tab === tab));
     this.render();
   },
 
@@ -38,12 +40,35 @@ const App = {
       if (!s.graph_gekoppeld) problemen.push("Microsoft niet gekoppeld");
       if (!s.claude.oauth_token && !s.claude.api_key) problemen.push("Claude niet gekoppeld");
       if (!s.push.vapid) problemen.push("push niet ingesteld");
-      el.className = "status " + (problemen.length ? "waarschuwing" : "ok");
-      el.title = problemen.join(", ") || "alles gekoppeld";
+      el.className = "sub" + (problemen.length ? " error" : "");
+      el.textContent = problemen.length ? problemen.join(", ") : `Verbonden · ${s.open_items} open · bijgewerkt ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}`;
       this.cache.status = s;
     } catch (e) {
-      el.className = "status fout"; el.title = e.message;
+      el.className = "sub error"; el.textContent = "Geen verbinding: " + e.message;
     }
+  },
+
+  laadThema() {
+    let aan = false;
+    try { aan = localStorage.getItem("imtech-assistent-dark") === "1"; } catch (_) {}
+    this.zetThema(aan);
+  },
+  zetThema(aan) {
+    document.documentElement.dataset.theme = aan ? "dark" : "";
+    const meta = document.getElementById("meta-theme-color"); if (meta) meta.content = aan ? "#121210" : "#2563EB";
+    const logo = document.getElementById("header-logo"); if (logo) logo.src = aan ? "branding/logo-wit.png" : "branding/logo-zwart.png";
+    try { localStorage.setItem("imtech-assistent-dark", aan ? "1" : "0"); } catch (_) {}
+  },
+  installBanner() {
+    const banner = document.getElementById("install-banner");
+    let prompt = null;
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault(); prompt = e;
+      try { if (localStorage.getItem("imtech-assistent-install-later") === "1") return; } catch (_) {}
+      banner.classList.remove("hidden");
+    });
+    document.getElementById("btn-install").addEventListener("click", async () => { banner.classList.add("hidden"); if (prompt) { prompt.prompt(); prompt = null; } });
+    document.getElementById("btn-install-dismiss").addEventListener("click", () => { banner.classList.add("hidden"); try { localStorage.setItem("imtech-assistent-install-later", "1"); } catch (_) {} });
   },
 
   async render() {
@@ -54,7 +79,7 @@ const App = {
       else if (this.tab === "praten") await this.rPraten(m);
       else await this.rInstellingen(m);
     } catch (e) {
-      m.innerHTML = `<div class="kaart fout"><b>Kan de assistent niet bereiken</b><p>${esc(e.message)}</p><p>Controleer adres en token bij Instellingen.</p></div>`;
+      m.innerHTML = `<div class="card fout"><b>Kan de assistent niet bereiken</b><p>${esc(e.message)}</p><p>Controleer adres en token bij Instellingen.</p></div>`;
     }
   },
 
@@ -66,7 +91,7 @@ const App = {
     const ag = v.agenda, afspraken = ag.afspraken || [];
     const uren = (ag.uren_bezet || 0).toFixed(1).replace(".0", "");
     m.innerHTML = `
-      <section class="kaart">
+      <section class="card">
         <div class="kop"><b>${datumNl(v.datum)}</b><span class="tag ${v.dag_vol ? "rood" : "groen"}">${v.dag_vol ? "dag zit vol" : uren + " uur bezet"}</span></div>
         ${afspraken.length ? `<ul class="agenda">${afspraken.map(a => `<li><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span> ${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}</li>`).join("")}</ul>` : `<p class="stil">Geen afspraken vandaag.</p>`}
         ${(v.morgen.afspraken || []).length ? `<p class="stil">Morgen: ${v.morgen.afspraken.length} afspraken, ${(v.morgen.uren_bezet || 0).toFixed(1).replace(".0", "")} uur.</p>` : ""}
@@ -150,7 +175,7 @@ const App = {
     m.innerHTML = `
       <div id="gesprek" class="gesprek">${g.berichten.map(b => `<div class="bel ${b.rol}">${esc(b.tekst)}</div>`).join("") || `<p class="stil">Vraag iets ("wat staat er open bij uMotion?") of geef iets door ("de offerte is verstuurd").</p>`}</div>
       <form id="vraag" class="vraagbalk">
-        <button type="button" id="mic" class="mic" title="inspreken">🎤</button>
+        <button type="button" id="mic" class="mic" title="inspreken" aria-label="Inspreken">🎤</button>
         <input name="tekst" placeholder="Typ of spreek in…" autocomplete="off">
         <button>Stuur</button>
       </form>`;
@@ -183,18 +208,19 @@ const App = {
     const s = this.cache.status;
     const perm = ("Notification" in window) ? Notification.permission : "n.v.t.";
     m.innerHTML = `
-      <form id="inst" class="kaart">
+      <form id="inst" class="card">
         <label>Adres van de assistent<input name="adres" value="${esc(c.adres)}" placeholder="https://assistant.imetech.nl" inputmode="url"></label>
         <label>Token<input name="token" value="${esc(c.token)}" type="password" autocomplete="off"></label>
-        <label class="rij"><input type="checkbox" name="stem" ${c.stem !== false ? "checked" : ""}> Antwoorden voorlezen</label>
-        <div class="rij"><button>Opslaan en testen</button></div>
+        <label class="check-row"><input type="checkbox" name="stem" ${c.stem !== false ? "checked" : ""}> Antwoorden voorlezen</label>
+        <label class="check-row"><input type="checkbox" id="toggle-dark-mode" ${document.documentElement.dataset.theme === "dark" ? "checked" : ""}> Donkere modus</label>
+        <div class="rij"><button class="btn-primary">Opslaan en testen</button></div>
       </form>
-      <section class="kaart">
+      <section class="card">
         <b>Meldingen</b>
         <p class="stil">Toestemming: ${perm}. ${s ? `Push op server: ${s.push.vapid ? "ingesteld" : "niet ingesteld"}, ${s.push.abonnementen} apparaat/apparaten.` : ""}</p>
-        <div class="rij"><button id="abonneer">Meldingen aanzetten op dit toestel</button><button id="pushtest" class="zacht">Testmelding</button></div>
+        <div class="rij"><button id="abonneer" class="btn-primary">Meldingen aanzetten op dit toestel</button><button id="pushtest" class="zacht">Testmelding</button></div>
       </section>
-      <section class="kaart">
+      <section class="card">
         <b>Status</b>
         ${s ? `<ul class="status-lijst">
           <li>Microsoft (agenda, mail, OneDrive): ${s.graph_gekoppeld ? "gekoppeld" : "niet gekoppeld"}</li>
@@ -211,6 +237,7 @@ const App = {
       await Opslag.set("instellingen", { adres: f.adres.value.trim(), token: f.token.value.trim(), stem: f.stem.checked });
       try { await Api.status(); this.toast("Verbonden"); await this.checkStatus(); this.render(); } catch (err) { this.toast(err.message, true); }
     });
+    m.querySelector("#toggle-dark-mode").addEventListener("change", (e) => this.zetThema(e.target.checked));
     m.querySelector("#abonneer").addEventListener("click", () => this.abonneer());
     m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, true); } });
     m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} direct, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, true); } });
