@@ -44,14 +44,18 @@ const App = {
     const einde = async () => {
       if (startY === null) return; startY = null;
       if (afstand < DREMPEL) { zet(0); return; }
-      bezig = true; ind.classList.add("bezig"); zet(56); ind.querySelector("span").textContent = "Vernieuwen…";
+      bezig = true; ind.classList.add("bezig"); zet(56); ind.querySelector("span").textContent = "Ophalen bij de assistent…";
       try { navigator.vibrate?.(15); } catch (_) {}
       try { await this.vernieuw(); } finally { setTimeout(() => { ind.classList.remove("bezig", "klaar"); zet(0); bezig = false; }, 300); }
     };
     main.addEventListener("touchend", einde); main.addEventListener("touchcancel", einde);
   },
 
-  async vernieuw() { await Promise.all([this.checkStatus(), this.render()]); },
+  /* Trekken: eerst een verzamelronde op de Pi (nieuwe mail, agenda, bestanden), dan het scherm. */
+  async vernieuw() {
+    try { await Api.verzamel(false); } catch (e) { this.toast(e.message, { fout: true }); }
+    await Promise.all([this.checkStatus(), this.render()]);
+  },
 
   ga(tab) {
     this.tab = tab;
