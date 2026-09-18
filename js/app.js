@@ -369,7 +369,7 @@ const App = {
           <li>Laatste triage met Claude: ${s.scheduler.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet"}</li>
           ${s.scheduler.fouten?.length ? `<li class="fout">Fouten: ${s.scheduler.fouten.map(esc).join("; ")}</li>` : ""}
         </ul>` : `<p class="stil">Nog geen verbinding.</p>`}
-        <div class="rij"><button type="button" id="verzamel" class="btn-secondary">Nu verzamelen</button><button type="button" id="triage" class="btn-secondary">Verzamelen + triage</button><button type="button" id="briefing" class="btn-secondary">Briefing nu</button></div>
+        <div class="rij"><button type="button" id="verzamel" class="btn-secondary">Nu verzamelen</button><button type="button" id="triage" class="btn-secondary">Verzamelen + opschonen</button><button type="button" id="briefing" class="btn-secondary">Briefing nu</button></div>
       </section>`;
     m.querySelector("#inst").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -386,7 +386,7 @@ const App = {
     m.querySelector("#abonneer").addEventListener("click", () => this.abonneer());
     m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} bijgewerkt, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
-    m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${r.dubbel || 0} dubbel, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
+    m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); const o = r.opschoon || {}; this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${(r.dubbel || 0) + (o.samengevoegd || 0)} samengevoegd, ${(r.afgerond || 0) + (o.afgerond || 0)} afgerond, ${o.hernoemd || 0} bijgewerkt`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },
 
