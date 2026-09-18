@@ -128,17 +128,29 @@ const App = {
     const uur = new Date().getHours();
     const groet = uur < 12 ? "Goedemorgen" : uur < 18 ? "Goedemiddag" : "Goedenavond";
     const nu = new Date().toTimeString().slice(0, 5);
-    const eerstvolgende = afspraken.find((a) => !a.hele_dag && a.van > nu);
+    const voorbij = (a) => !a.hele_dag && a.tot && a.tot <= nu;
+    const nog = afspraken.filter((a) => !voorbij(a));
+    const eerstvolgende = nog.find((a) => !a.hele_dag && a.van > nu);
     const dringend = v.top.filter((i) => i.prio_score >= 80);
-    let zin = v.dag_vol ? `je dag zit vol (${uren} uur agenda)` : afspraken.length ? `${afspraken.length} afspra${afspraken.length === 1 ? "ak" : "ken"} vandaag, ${uren} uur` : "geen afspraken vandaag";
-    if (eerstvolgende) zin += `, straks ${esc(eerstvolgende.titel)} om ${eerstvolgende.van}`;
+    const avond = uur >= 18;
+    const morgen = (v.morgen && v.morgen.afspraken) || [];
+    const n = (k) => `${k} afspra${k === 1 ? "ak" : "ken"}`;
+    let zin;
+    if (avond) zin = morgen.length ? `morgen ${n(morgen.length)}${v.morgen.uren_bezet >= 6 ? ", dat wordt een volle dag" : ""}` : "morgen geen afspraken";
+    else if (!afspraken.length) zin = "geen afspraken vandaag";
+    else if (!nog.length) zin = `de ${n(afspraken.length)} van vandaag ${afspraken.length === 1 ? "is" : "zijn"} geweest`;
+    else if (nog.length < afspraken.length) zin = `nog ${n(nog.length)} vandaag`;
+    else zin = v.dag_vol ? `je dag zit vol (${uren} uur agenda)` : `${n(afspraken.length)} vandaag, ${uren} uur`;
+    if (!avond && eerstvolgende) zin += `, straks ${esc(eerstvolgende.titel)} om ${eerstvolgende.van}`;
     zin += ". " + (dringend.length ? `${dringend.length} ${dringend.length === 1 ? "punt vraagt" : "punten vragen"} aandacht.` : v.aantal_open ? `${v.aantal_open} open punten, niets dringends.` : "Niets open.");
+    const lijst = avond ? morgen : afspraken;
+    const lijstKop = avond ? `<p class="stil">Morgen</p>` : "";
 
     m.innerHTML = `
       <section class="card groet">
         <div class="groet-kop">${IC("ic-assistent")}<b>${groet}, ${naam}.</b></div>
         <p>${zin}</p>
-        ${afspraken.length ? `<ul class="agenda">${afspraken.map((a) => `<li><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span><span>${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}</span></li>`).join("")}</ul>` : ""}
+        ${lijst.length ? `${lijstKop}<ul class="agenda">${lijst.map((a) => `<li class="${!avond && voorbij(a) ? "voorbij" : ""}"><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span><span>${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}</span></li>`).join("")}</ul>` : ""}
       </section>
       ${v.top.length ? `<h2>Nu belangrijk</h2><div id="top">${v.top.slice(0, 3).map((it) => this.itemRij(it)).join("")}</div>
         <button type="button" class="btn-link" id="naar-overzicht">Alle ${v.aantal_open} open punten ${IC("ic-chevron")}</button>` : ""}

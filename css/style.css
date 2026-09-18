@@ -257,3 +257,4 @@ details.card.klein > summary h2::before { content: "▸ "; font-size: .75em; }
 details.card.klein[open] > summary h2::before { content: "▾ "; }
 details.card.klein #wbso-inhoud { margin-top: 10px; }
 #wbso-lijst { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; max-height: 220px; overflow-y: auto; }
+.agenda li.voorbij { opacity: .45; text-decoration: line-through; }
