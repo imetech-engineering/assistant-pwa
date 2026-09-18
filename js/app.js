@@ -26,7 +26,32 @@ const App = {
     this.ga(this.tab);
     this.checkStatus();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) { this.checkStatus(); this.render(); } });
+    this.initTrekVernieuwen();
   },
+
+  /* Naar beneden slepen bovenaan de lijst = vernieuwen, zoals in andere apps. */
+  initTrekVernieuwen() {
+    const main = document.getElementById("scherm"), ind = document.getElementById("ptr");
+    const DREMPEL = 72; let startY = null, afstand = 0, bezig = false;
+    const zet = (px) => { ind.style.height = px + "px"; ind.classList.toggle("klaar", px >= DREMPEL); ind.querySelector("span").textContent = px >= DREMPEL ? "Loslaten om te vernieuwen" : "Trek om te vernieuwen"; };
+    main.addEventListener("touchstart", (e) => { startY = (main.scrollTop <= 0 && !bezig) ? e.touches[0].clientY : null; afstand = 0; }, { passive: true });
+    main.addEventListener("touchmove", (e) => {
+      if (startY === null) return;
+      const d = e.touches[0].clientY - startY;
+      if (d <= 0 || main.scrollTop > 0) { if (afstand) zet(0); afstand = 0; return; }
+      afstand = Math.min(Math.pow(d, 0.85), 110); zet(afstand);
+    }, { passive: true });
+    const einde = async () => {
+      if (startY === null) return; startY = null;
+      if (afstand < DREMPEL) { zet(0); return; }
+      bezig = true; ind.classList.add("bezig"); zet(56); ind.querySelector("span").textContent = "Vernieuwen…";
+      try { navigator.vibrate?.(15); } catch (_) {}
+      try { await this.vernieuw(); } finally { setTimeout(() => { ind.classList.remove("bezig", "klaar"); zet(0); bezig = false; }, 300); }
+    };
+    main.addEventListener("touchend", einde); main.addEventListener("touchcancel", einde);
+  },
+
+  async vernieuw() { await Promise.all([this.checkStatus(), this.render()]); },
 
   ga(tab) {
     this.tab = tab;
