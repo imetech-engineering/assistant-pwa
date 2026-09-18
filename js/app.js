@@ -88,6 +88,7 @@ const App = {
       el.textContent = problemen.length ? problemen.join(", ") : `${s.open_items} open punten · bijgewerkt ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}`;
       this.cache.status = s;
       document.getElementById("badge").textContent = s.open_items || "";
+      try { if (navigator.setAppBadge) { s.urgent_items ? navigator.setAppBadge(s.urgent_items) : navigator.clearAppBadge(); } } catch (_) {}
     } catch (e) {
       el.className = "sub error"; el.textContent = "Geen verbinding met de assistent";
     }
@@ -288,7 +289,7 @@ const App = {
   /* ---------- itemrij: tik om open te klappen, dan de acties ---------- */
   itemRij(it, afgehandeld = false) {
     const due = it.due_at ? `<span class="tag ${dueKleur(it.due_at)}">${datumKort(it.due_at)}</span>` : "";
-    const bron = { boekhouding: "boekhouding", outlook_mail: "mail", projectdoc: "projectlogboek", uren: "uren", claude: "Claude-sessie", plaud: "opname", google_agenda: "agenda", outlook_agenda: "agenda", handmatig: "zelf toegevoegd" }[it.bron] || it.bron;
+    const bron = { boekhouding: "boekhouding", outlook_mail: "mail", projectdoc: "projectlogboek", uren: "uren", claude: "Claude-sessie", plaud: "opname", google_agenda: "agenda", outlook_agenda: "agenda", handmatig: "zelf toegevoegd", kalender: "vaste deadline" }[it.bron] || it.bron;
     return `<div class="item" data-id="${it.id}">
       <button type="button" class="item-kop" aria-expanded="false">
         <span class="prio p${prioKlasse(it.prio_score)}"></span>
@@ -306,7 +307,8 @@ const App = {
           <button type="button" data-actie="snooze" data-tot="morgen">${IC("ic-klok")} Morgen</button>
           <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>
           <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>
-          ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}`}
+          ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}
+          ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}`}
         </div>
       </div>
     </div>`;
@@ -320,7 +322,7 @@ const App = {
     }));
     root.querySelectorAll(".item .acties button[data-herinnering]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
-      try { await Api.herinnering(b.dataset.herinnering); this.toast("Herinnering wordt klaargezet, je krijgt een melding als het concept in Outlook staat"); }
+      try { await Api.herinnering(b.dataset.herinnering); this.toast("Wordt klaargezet, je krijgt een melding als het concept in Outlook staat"); }
       catch (e) { b.disabled = false; this.toast(e.message, { fout: true }); }
     }));
     root.querySelectorAll(".item .acties button[data-actie]").forEach((b) => b.addEventListener("click", async () => {

@@ -21,7 +21,7 @@ const Api = {
   items(status = "open") { return this.call("/items?status=" + encodeURIComponent(status)); },
   nieuwItem(body) { return this.call("/items", { method: "POST", body }); },
   actie(id, actie, extra = {}) { return this.call(`/items/${id}/actie`, { method: "POST", body: { actie, ...extra } }); },
-  herinnering(id) { return this.call(`/items/${id}/herinnering`, { method: "POST" }); },
+  herinnering(id) { return this.call(`/items/${id}/concept`, { method: "POST" }); },
   chat(tekst) { return this.call("/chat", { method: "POST", body: { tekst } }); },
   chatGeschiedenis() { return this.call("/chat"); },
   vapid() { return this.call("/push/vapid"); },
