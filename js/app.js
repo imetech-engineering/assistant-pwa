@@ -340,6 +340,27 @@ const App = {
     }));
   },
 
+  /* WBSO: per jaar aanvinken welke projecten meetellen (klein, eens per jaar). */
+  async rWbso(el, jaar) {
+    let w;
+    try { w = await Api.wbso(jaar); } catch (e) { el.innerHTML = `<p class="stil">${esc(e.message)}</p>`; return; }
+    const dit = new Date().getFullYear();
+    const namen = [...new Set([...(w.beschikbaar || []), ...(w.projecten || [])])].sort((a, b) => a.localeCompare(b));
+    const gekozen = new Set(w.projecten || []);
+    el.innerHTML = `
+      <div class="rij"><label>Jaar <select id="wbso-jaar">${[dit - 1, dit, dit + 1].map((j) => `<option value="${j}" ${j === w.jaar ? "selected" : ""}>${j}</option>`).join("")}</select></label>
+        ${w.stand && w.stand.jaar == w.jaar ? `<span class="hint">${w.stand.totaal} van ${w.doel} uur, nog ${w.stand.nog_nodig}</span>` : ""}</div>
+      <div id="wbso-lijst">${namen.length ? namen.map((n) => `<label class="check-row"><input type="checkbox" value="${esc(n)}" ${gekozen.has(n) ? "checked" : ""}> ${esc(n)}</label>`).join("") : `<p class="stil">Nog geen projecten uit de urenadministratie voor dit jaar.</p>`}</div>
+      <div class="rij"><input id="wbso-extra" placeholder="Nieuw project (nog niet in de uren)" autocomplete="off"><button type="button" id="wbso-opslaan" class="btn-primary">Opslaan</button></div>`;
+    el.querySelector("#wbso-jaar").addEventListener("change", (e) => this.rWbso(el, parseInt(e.target.value, 10)));
+    el.querySelector("#wbso-opslaan").addEventListener("click", async () => {
+      const lijst = [...el.querySelectorAll("#wbso-lijst input:checked")].map((i) => i.value);
+      const extra = el.querySelector("#wbso-extra").value.trim(); if (extra) lijst.push(extra);
+      try { await Api.wbsoZet(parseInt(el.querySelector("#wbso-jaar").value, 10), lijst); this.toast("WBSO-projecten opgeslagen"); this.rWbso(el, parseInt(el.querySelector("#wbso-jaar").value, 10)); }
+      catch (e) { this.toast(e.message, { fout: true }); }
+    });
+  },
+
   /* ============================ INSTELLINGEN ============================ */
   async rInstellingen(m) {
     const c = await Opslag.instellingen();
@@ -370,6 +391,10 @@ const App = {
         <div id="install-manual" class="hint hidden">Installeren: open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</div>
         <div class="rij"><button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button></div>
       </section>
+      <details class="card klein" id="wbso-sectie">
+        <summary><h2>WBSO-projecten</h2><span class="hint">Eens per jaar: welke projecten tellen mee voor de 500 uur.</span></summary>
+        <div id="wbso-inhoud"><p class="stil">Laden…</p></div>
+      </details>
       <section class="card">
         <h2>Status</h2>
         ${s ? `<ul class="status-lijst">
@@ -397,6 +422,7 @@ const App = {
     m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} bijgewerkt, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); const o = r.opschoon || {}; this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${(r.dubbel || 0) + (o.samengevoegd || 0)} samengevoegd, ${(r.afgerond || 0) + (o.afgerond || 0)} afgerond, ${o.hernoemd || 0} bijgewerkt`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
+    m.querySelector("#wbso-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rWbso(m.querySelector("#wbso-inhoud")); }, { once: false });
     m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },
 

@@ -248,3 +248,12 @@ html[data-theme="dark"] .toast-knop { color: var(--bg-primary); }
 
 .opdracht .rij { margin-top: 6px; }
 .opdracht .btn-link { padding-left: 0; }
+
+/* Kleine, ingeklapte instellingen (eens per jaar) */
+details.card.klein > summary { list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+details.card.klein > summary::-webkit-details-marker { display: none; }
+details.card.klein > summary h2 { margin: 0; }
+details.card.klein > summary h2::before { content: "▸ "; font-size: .75em; }
+details.card.klein[open] > summary h2::before { content: "▾ "; }
+details.card.klein #wbso-inhoud { margin-top: 10px; }
+#wbso-lijst { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; max-height: 220px; overflow-y: auto; }
