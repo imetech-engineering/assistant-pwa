@@ -236,13 +236,14 @@ const App = {
   groepeer(items) {
     const groepen = new Map();
     for (const it of items) {
-      const sleutel = it.project && it.categorie !== "geld" ? it.project : (CAT_NAAM[it.categorie] || "Overig");
+      const sleutel = it.categorie === "prive" ? CAT_NAAM.prive : (it.project && it.categorie !== "geld" ? it.project : (CAT_NAAM[it.categorie] || "Overig"));
       if (!groepen.has(sleutel)) groepen.set(sleutel, { naam: sleutel, items: [], max: 0, due: null, isProject: !!it.project && it.categorie !== "geld" });
       const g = groepen.get(sleutel);
       g.items.push(it); g.max = Math.max(g.max, it.prio_score || 0);
       if (it.due_at && (!g.due || it.due_at < g.due)) g.due = it.due_at;
     }
-    return [...groepen.values()].sort((a, b) => b.max - a.max || a.naam.localeCompare(b.naam));
+    const prive = (g) => g.naam === CAT_NAAM.prive ? 1 : 0;   // privé altijd onderaan, apart
+    return [...groepen.values()].sort((a, b) => prive(a) - prive(b) || b.max - a.max || a.naam.localeCompare(b.naam));
   },
 
   async rOverzicht(m) {
@@ -298,12 +299,14 @@ const App = {
         ${it.omschrijving ? `<p class="omschr">${esc(it.omschrijving)}</p>` : ""}
         ${it.meta?.link ? `<a href="${esc(it.meta.link)}" target="_blank" rel="noopener">Open in Outlook</a>` : ""}
         ${it.meta?.auto ? `<p class="stil">Automatisch: ${esc(it.meta.auto)}</p>` : ""}
+        ${it.meta?.wacht_op ? `<p class="stil">Wacht op ${esc(it.meta.wacht_op)}${it.last_touched_at ? " sinds " + datumKort(it.last_touched_at.slice(0, 10)) : ""}</p>` : ""}
         <div class="acties">
           ${afgehandeld ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Terugzetten</button>` : `
           <button type="button" data-actie="done" class="goed">${IC("ic-vink")} Gedaan</button>
           <button type="button" data-actie="snooze" data-tot="morgen">${IC("ic-klok")} Morgen</button>
           <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>
-          <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>`}
+          <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>
+          ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}`}
         </div>
       </div>
     </div>`;
@@ -315,7 +318,12 @@ const App = {
       root.querySelectorAll(".item-kop[aria-expanded=true]").forEach((x) => { x.setAttribute("aria-expanded", "false"); x.nextElementSibling.classList.add("hidden"); });
       if (!open) { k.setAttribute("aria-expanded", "true"); k.nextElementSibling.classList.remove("hidden"); }
     }));
-    root.querySelectorAll(".item .acties button").forEach((b) => b.addEventListener("click", async () => {
+    root.querySelectorAll(".item .acties button[data-herinnering]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await Api.herinnering(b.dataset.herinnering); this.toast("Herinnering wordt klaargezet, je krijgt een melding als het concept in Outlook staat"); }
+      catch (e) { b.disabled = false; this.toast(e.message, { fout: true }); }
+    }));
+    root.querySelectorAll(".item .acties button[data-actie]").forEach((b) => b.addEventListener("click", async () => {
       const kaart = b.closest(".item"), id = kaart.dataset.id, actie = b.dataset.actie;
       const titel = kaart.querySelector(".titel").textContent;
       kaart.classList.add("weg");

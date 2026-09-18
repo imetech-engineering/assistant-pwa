@@ -1,7 +1,7 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v8";
+const CACHE = "assistent-v9";
 const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
@@ -19,7 +19,8 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data.json(); } catch (_) { d = { titel: "Assistent", body: e.data ? e.data.text() : "" }; }
-  const acties = d.acties ? [{ action: "done", title: "Gedaan" }, { action: "snooze", title: "Morgen" }] : [];
+  const acties = d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
+    : (d.acties ? [{ action: "done", title: "Gedaan" }, { action: "snooze", title: "Morgen" }] : []);
   e.waitUntil(Promise.all([
     self.registration.showNotification(d.titel || "Assistent", {
       body: d.body || "", icon: "icons/icon-192.png", badge: "icons/badge-96.png",
@@ -50,11 +51,14 @@ async function actie(itemId, actie, meldingId) {
   if (!c.adres || !c.token) return;
   const body = { actie, melding_id: meldingId || null };
   if (actie === "snooze") body.tot = "morgen";
+  const kop = { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" };
   try {
-    await fetch(c.adres.replace(/\/$/, "") + `/api/items/${itemId}/actie`, {
-      method: "POST", headers: { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" }, body: JSON.stringify(body),
-    });
-    await self.registration.showNotification(actie === "done" ? "Afgevinkt" : "Uitgesteld tot morgen", { icon: "icons/icon-192.png", tag: "bevestiging", silent: true });
+    if (actie === "herinnering") {
+      await fetch(c.adres.replace(/\/$/, "") + `/api/items/${itemId}/herinnering`, { method: "POST", headers: kop });
+    } else {
+      await fetch(c.adres.replace(/\/$/, "") + `/api/items/${itemId}/actie`, { method: "POST", headers: kop, body: JSON.stringify(body) });
+    }
+    await self.registration.showNotification({ done: "Afgevinkt", snooze: "Uitgesteld tot morgen", herinnering: "Herinnering wordt klaargezet" }[actie] || "Ok", { icon: "icons/icon-192.png", tag: "bevestiging", silent: true });
     (await self.clients.matchAll({ type: "window" })).forEach(x => x.postMessage({ type: "vernieuw" }));
   } catch (e) {
     await self.registration.showNotification("Niet gelukt", { body: "Open de app en probeer opnieuw.", icon: "icons/icon-192.png", tag: "bevestiging" });
