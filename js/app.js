@@ -190,6 +190,7 @@ const App = {
     const link = (o.resultaat || "").match(/https?:\/\/\S+/);
     return `<div class="card opdracht">
       <div class="kop"><b>${naam}</b><span class="tag ${status[0]}">${status[1]}</span></div>
+      ${o.context?.project || o.context?.contact ? `<p class="sub">${[o.context.project, o.context.contact].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
       <p class="stil">${esc(o.tekst)}</p>
       ${o.resultaat ? `<p class="omschr">${esc(o.resultaat.replace(/https?:\/\/\S+/, "").trim())}</p>` : o.status === "wacht" ? `<p class="hint">Wordt binnen een uur opgepakt; je krijgt een melding.</p>` : ""}
       <div class="rij">
