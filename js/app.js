@@ -236,7 +236,7 @@ const App = {
       Object.assign(wacht, { tekst: r.antwoord, wacht: false, acties: r.acties });
       const inst = await Opslag.instellingen();
       if (viaSpraak || inst.stem !== false) Spraak.spreek(r.antwoord, inst.stemNaam);
-      if (r.acties?.length) { this.checkStatus(); if (r.acties.some((a) => a.actie === "opdracht") && this.tab === "assistent") setTimeout(() => this.render(), 1500); }
+      if (r.acties?.length) { this.checkStatus(); if (this.tab === "assistent") setTimeout(() => this.render(), r.acties.some((a) => a.actie === "opdracht") ? 1500 : 400); }
     } catch (e) {
       Object.assign(wacht, { tekst: "Dat lukte even niet: " + e.message, wacht: false, fout: true });
     }
