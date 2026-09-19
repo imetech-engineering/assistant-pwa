@@ -202,7 +202,9 @@ const App = {
   },
 
   belHtml(b) {
-    return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map((a) => `<span class="tag ${a.actie === "opdracht" ? "oranje" : "groen"}">${IC(a.actie === "opdracht" ? "ic-klok" : "ic-vink")} ${a.actie === "opdracht" ? "In de wachtrij: " : ""}${esc(a.titel)}</span>`).join("")}</div>` : ""}</div>`;
+    const label = { opdracht: "In de wachtrij: ", opdracht_wijzig: "Opdracht bijgewerkt: ", opdracht_annuleer: "Opdracht geannuleerd: ", done: "Afgevinkt: ", dismiss: "Weg: ", snooze: "Uitgesteld: ", due: "Deadline gezet: ", hernoem: "Hernoemd: ", wacht: "Wacht op antwoord: ", houd: "Blijft staan: ", nieuw: "Toegevoegd: ", reopen: "Teruggezet: " };
+    const chip = (a) => { const opd = a.actie.startsWith("opdracht"); return `<span class="tag ${opd ? "oranje" : "groen"}">${IC(opd ? "ic-klok" : "ic-vink")} ${label[a.actie] || ""}${esc(a.titel)}</span>`; };
+    return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map(chip).join("")}</div>` : ""}</div>`;
   },
   scrollGesprek() { const g = document.getElementById("gesprek"); if (g) g.lastElementChild?.scrollIntoView({ block: "nearest" }); },
 
