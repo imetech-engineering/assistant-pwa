@@ -258,3 +258,17 @@ details.card.klein[open] > summary h2::before { content: "▾ "; }
 details.card.klein #wbso-inhoud { margin-top: 10px; }
 #wbso-lijst { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; max-height: 220px; overflow-y: auto; }
 .agenda li.voorbij { opacity: .45; text-decoration: line-through; }
+
+/* Lange teksten nooit buiten beeld: chatbellen, actiechips, agendaregels, toast */
+.bel { overflow-wrap: anywhere; min-width: 0; }
+.bel-acties .tag { white-space: normal; overflow-wrap: anywhere; max-width: 100%; line-height: 1.3; padding: 4px 10px; border-radius: 10px; }
+.bel-acties .tag .ic { flex-shrink: 0; }
+.agenda li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.agenda li .tijd { flex-shrink: 0; }
+.item-kop .tekst, .groep-tekst, .titel, .sub, .omschr { overflow-wrap: anywhere; }
+.item-kop .tag { flex-shrink: 0; }
+.toast { max-width: calc(100vw - 32px); }
+.toast #toast-tekst, .toast > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.acties { flex-wrap: wrap; }
+.acties button { max-width: 100%; white-space: normal; text-align: left; }
+.hint, .stil { overflow-wrap: anywhere; }
