@@ -14,6 +14,13 @@
  * Android stopt de herkenning ook uit zichzelf na een stilte. Daarom starten we
  * hem weer op zolang de gebruiker niet zelf op stop heeft gedrukt; wat tot dan
  * herkend was, gaat mee als vaste basis de volgende ronde in.
+ *
+ * Met muziek aan of Android Auto verbonden wisselt Android de audioroute (de
+ * microfoon kan naar de auto gaan en weer terug). De herkenner geeft dan een
+ * `audio-capture`- of `network`-fout en stopte vroeger meteen, midden in een zin.
+ * Nu proberen we het een paar keer opnieuw (met een korte pauze) en houden we
+ * de tekst vast. Pas als het echt niet lukt melden we dat, met `onderbroken` in
+ * onEinde, zodat de app niets half verstuurt.
  */
 (function (global) {
   const Herkenner = global.SpeechRecognition || global.webkitSpeechRecognition;
@@ -23,6 +30,9 @@
   let handlers = {};
   let afgerond = ""; // uit eerdere ronden, na een herstart
   let ronde = ""; // uit de lopende ronde
+  let pogingen = 0; // herstarts na een fout, achter elkaar
+  let onderbroken = false; // gestopt door een fout i.p.v. door de gebruiker
+  const MAX_POGINGEN = 4;
 
   const luisterenKan = () => !!Herkenner;
   const sprekenKan = () => "speechSynthesis" in global;
@@ -68,6 +78,8 @@
     handlers = opties;
     afgerond = "";
     ronde = "";
+    pogingen = 0;
+    onderbroken = false;
     gewenst = true;
     open();
     return true;
@@ -89,6 +101,7 @@
         else voorlopig = voegSamen(voorlopig, stuk);
       }
       ronde = vast;
+      pogingen = 0; // er komt weer geluid binnen: de teller mag terug
       handlers.onTekst?.(samen(""));
       handlers.onTussentijds?.(voorlopig.trim());
     };
@@ -97,13 +110,22 @@
       // Een stilte of een afgebroken herkenning is geen echte fout: gewoon
       // opnieuw beginnen. Bij een geweigerde microfoon stoppen we wel.
       if (e.error === "no-speech" || e.error === "aborted") return;
+      // Audioroute wisselt (muziek, Bluetooth, Android Auto) of het netwerk hapert:
+      // een paar keer opnieuw proberen; onend doet de herstart.
+      if ((e.error === "audio-capture" || e.error === "network") && gewenst && pogingen < MAX_POGINGEN) {
+        pogingen++;
+        return;
+      }
+      if (gewenst) onderbroken = true;
       gewenst = false;
       handlers.onFout?.(
         e.error === "not-allowed" || e.error === "service-not-allowed"
           ? "Geen toegang tot de microfoon. Sta dit toe in de browserinstellingen."
           : e.error === "network"
-            ? "Spraakherkenning heeft internet nodig en kan er nu niet bij."
-            : "Spraakherkenning stopte onverwacht."
+            ? "Spraakherkenning heeft internet nodig en kan er nu niet bij. Je tekst staat nog in het veld."
+            : e.error === "audio-capture"
+              ? "Microfoon viel weg (muziek of auto?). Je tekst staat nog in het veld."
+              : "Spraakherkenning stopte onverwacht. Je tekst staat nog in het veld."
       );
     };
 
@@ -113,14 +135,22 @@
       afgerond = samen("");
       ronde = "";
       if (gewenst) {
-        try {
-          sessie.start();
-          return;
-        } catch (_) {
-          gewenst = false;
-        }
+        const herstart = () => {
+          if (!gewenst) return handlers.onEinde?.({ onderbroken });
+          try {
+            sessie.start();
+          } catch (_) {
+            gewenst = false;
+            onderbroken = true;
+            handlers.onEinde?.({ onderbroken });
+          }
+        };
+        // Na een fout even wachten tot de audioroute stabiel is; anders meteen door.
+        if (pogingen > 0) setTimeout(herstart, 400 * pogingen);
+        else herstart();
+        return;
       }
-      handlers.onEinde?.();
+      handlers.onEinde?.({ onderbroken });
     };
 
     try {

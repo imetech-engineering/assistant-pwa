@@ -179,8 +179,8 @@ const App = {
     m.querySelectorAll("[data-opdracht-gezien]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtGezien(b.dataset.opdrachtGezien); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     const input = m.querySelector("#vraag-tekst");
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.stuur(input.value, false); } });
-    m.querySelector("#btn-stuur").addEventListener("click", () => this.stuur(input.value, false));
-    m.querySelector("#btn-dicteer").addEventListener("click", () => this.dicteer(m.querySelector("#btn-dicteer"), input));
+    m.querySelector("#btn-stuur").addEventListener("click", () => { if (Spraak.luistert()) { this.dicteerModus = "vasthouden"; Spraak.stop(); return; } this.stuur(input.value, this.laatsteViaSpraak); });   // tijdens opnemen: stoppen en versturen zodra de laatste woorden binnen zijn
+    this.bindMicrofoon(m.querySelector("#btn-dicteer"), input);
     if (this.gesprek.length) this.scrollGesprek();
   },
 
@@ -208,27 +208,59 @@ const App = {
   },
   scrollGesprek() { const g = document.getElementById("gesprek"); if (g) g.lastElementChild?.scrollIntoView({ block: "nearest" }); },
 
+  /* Microfoon: kort tikken = opnemen tot je nog eens tikt, daarna zelf nakijken en versturen.
+     Ingedrukt houden = praten zolang je vasthoudt, bij loslaten meteen versturen (walkietalkie).
+     De opname start al bij het indrukken, zodat het eerste woord niet wegvalt. */
+  bindMicrofoon(knop, veld) {
+    const VASTHOUDEN_MS = 350;
+    let neer = 0, bijStart = false;
+    knop.addEventListener("contextmenu", (e) => e.preventDefault());
+    knop.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      try { knop.setPointerCapture(e.pointerId); } catch (_) {}
+      neer = Date.now();
+      bijStart = !Spraak.luistert();
+      if (bijStart) this.dicteer(knop, veld);
+    });
+    const los = () => {
+      if (!neer) return;
+      const lang = Date.now() - neer >= VASTHOUDEN_MS;
+      neer = 0;
+      if (!Spraak.luistert()) return;
+      if (lang && bijStart) { this.dicteerModus = "vasthouden"; Spraak.stop(); }   // loslaten: versturen zodra de laatste woorden binnen zijn
+      else if (!bijStart) { this.dicteerModus = "tik"; Spraak.stop(); }            // tweede tik: stoppen, niet versturen
+      else { this.dicteerModus = "tik"; this.toast("Ik luister… tik nog eens om te stoppen. Vasthouden = meteen versturen."); }
+    };
+    knop.addEventListener("pointerup", los);
+    knop.addEventListener("pointercancel", los);
+    knop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (Spraak.luistert()) { this.dicteerModus = "tik"; Spraak.stop(); } else { this.dicteerModus = "tik"; this.dicteer(knop, veld); } } });
+  },
+
   dicteer(knop, veld) {
-    if (Spraak.luistert()) { Spraak.stop(); return; }
     Spraak.stil();
     const hint = document.getElementById("dicteer-hint");
+    const basis = veld.value.trim();   // al getypte of eerder ingesproken tekst blijft staan
     let laatste = "";
+    this.dicteerModus = "tik";
     const gestart = Spraak.start({
-      onTekst(volledig) { veld.value = volledig; laatste = volledig; },
+      onTekst(volledig) { laatste = volledig; veld.value = Spraak.voegSamen(basis, volledig); },
       onTussentijds(voorlopig) { hint.textContent = voorlopig ? "… " + voorlopig : ""; hint.classList.toggle("hidden", !voorlopig); },
       onFout: (msg) => this.toast(msg, { fout: true }),
-      onEinde: () => {
+      onEinde: ({ onderbroken } = {}) => {
         knop.setAttribute("aria-pressed", "false"); knop.title = "Inspreken"; hint.classList.add("hidden");
-        if (laatste.trim()) this.stuur(laatste, true);   // klaar met praten: meteen versturen en antwoord voorlezen
+        this.laatsteViaSpraak = !!laatste.trim();
+        if (this.dicteerModus === "vasthouden" && !onderbroken && veld.value.trim()) { this.stuur(veld.value, true); return; }
+        if (laatste.trim() && !onderbroken) { hint.textContent = "Kijk het na en druk op versturen."; hint.classList.remove("hidden"); setTimeout(() => hint.classList.add("hidden"), 4000); }
       },
     });
-    if (gestart) { knop.setAttribute("aria-pressed", "true"); knop.title = "Stoppen"; this.toast("Ik luister… tik nog eens om te stoppen"); }
+    if (gestart) { knop.setAttribute("aria-pressed", "true"); knop.title = "Stoppen"; if (navigator.vibrate) navigator.vibrate(20); }
   },
 
   async stuur(tekst, viaSpraak) {
     tekst = (tekst || "").trim();
     if (!tekst) return;
     const input = document.getElementById("vraag-tekst"); if (input) input.value = "";
+    this.laatsteViaSpraak = false;
     this.gesprek.push({ rol: "user", tekst });
     const wacht = { rol: "assistant", tekst: "Even kijken…", wacht: true };
     this.gesprek.push(wacht);
