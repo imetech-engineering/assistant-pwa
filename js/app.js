@@ -385,7 +385,17 @@ const App = {
     const deel = grens ? Math.min(100, Math.round((w.tokens || 0) / grens * 100)) : 0;
     const top = Math.max(1, ...(v.per_dag || []).map((x) => x.tokens || 0));
     const staafKleur = deel >= 100 ? "rood" : deel >= 80 ? "oranje" : "grijs";
+    const mx = v.max || {}, mg = v.grens_max_pct || 0;
+    const mKleur = (p) => (mg && p >= mg) ? "rood" : (mg && p >= 0.8 * mg) ? "oranje" : "grijs";
+    const wanneer = (s) => s ? datumKort(s) + " " + s.slice(11, 16) : "";
     el.innerHTML = `
+      <p class="stil"><strong>Claude Max</strong> (hele account: chat, Cowork, Claude Code en de assistent samen)</p>
+      ${mx.week_pct != null ? `<div class="meter"><div class="meter-vul ${mKleur(mx.week_pct)}" style="width:${Math.min(100, mx.week_pct)}%"></div></div>
+        <p class="hint">Week ${mx.week_pct}%${mx.week_reset ? `, reset ${esc(wanneer(mx.week_reset))}` : ""}.${mx.vijf_uur_pct != null ? ` 5 uur: ${mx.vijf_uur_pct}%.` : ""} Gemeten ${esc(wanneer(mx.gemeten))}, bij de laatste run van de assistent.</p>`
+        : `<p class="hint">${v.max ? "Weekvenster is gereset sinds de laatste meting; nieuw getal na de volgende run." : "Nog geen meting; komt mee met de volgende run van de assistent."}</p>`}
+      <div class="rij"><label>Rem bij Max-week % <input id="verbruik-max" type="number" min="0" max="100" step="5" value="${mg}" inputmode="numeric"></label><button type="button" id="verbruik-max-opslaan" class="btn-primary">Opslaan</button></div>
+      <p class="hint">Boven dit percentage slaat de assistent geplande rondes over. Chat en opdrachten blijven werken. 0 = uit.</p>
+      <p class="stil"><strong>Assistent zelf</strong></p>
       <p class="stil">Vandaag ${tok(d.tokens)} in ${d.runs || 0} run(s). Deze week ${tok(w.tokens)} in ${w.runs || 0} run(s).</p>
       ${grens ? `<div class="meter"><div class="meter-vul ${staafKleur}" style="width:${deel}%"></div></div>
         <p class="hint">${deel}% van je weekgrens (${tok(grens)}).${deel >= 80 ? " Assistent slaat niet-urgente runs over zodra de grens vol is." : ""}</p>` : ""}
@@ -395,6 +405,10 @@ const App = {
       <div class="rij"><label>Weekgrens <input id="verbruik-grens" type="number" min="0" step="100000" value="${grens}" inputmode="numeric"></label><button type="button" id="verbruik-opslaan" class="btn-primary">Opslaan</button></div>
       <div class="chips">${[7, 14, 30].map((n) => `<button type="button" class="chip ${n === dagen ? "actief" : ""}" data-dagen="${n}">${n} dagen</button>`).join("")}</div>`;
     el.querySelectorAll(".chip[data-dagen]").forEach((b) => b.addEventListener("click", () => this.rVerbruik(el, parseInt(b.dataset.dagen, 10))));
+    el.querySelector("#verbruik-max-opslaan").addEventListener("click", async () => {
+      try { await Api.verbruikMaxGrens(parseInt(el.querySelector("#verbruik-max").value, 10) || 0); this.toast("Rem opgeslagen"); this.rVerbruik(el, dagen); }
+      catch (e) { this.toast(e.message, { fout: true }); }
+    });
     el.querySelector("#verbruik-opslaan").addEventListener("click", async () => {
       try { await Api.verbruikGrens(parseInt(el.querySelector("#verbruik-grens").value, 10) || 0); this.toast("Weekgrens opgeslagen"); this.rVerbruik(el, dagen); }
       catch (e) { this.toast(e.message, { fout: true }); }
@@ -432,7 +446,7 @@ const App = {
         <div class="rij"><button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button></div>
       </section>
       <details class="card klein" id="verbruik-sectie">
-        <summary><h2>Verbruik</h2><span class="hint">Wat de assistent zelf aan Claude opmaakt.</span></summary>
+        <summary><h2>Verbruik</h2><span class="hint">Je Claude Max-week en wat de assistent zelf opmaakt.</span></summary>
         <div id="verbruik-inhoud"><p class="stil">Laden…</p></div>
       </details>
       <details class="card klein" id="wbso-sectie">

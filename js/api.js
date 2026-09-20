@@ -36,4 +36,5 @@ const Api = {
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },
   verbruik(dagen = 14) { return this.call("/verbruik?dagen=" + dagen); },
   verbruikGrens(tokens_week) { return this.call("/verbruik/grens", { method: "POST", body: { tokens_week } }); },
+  verbruikMaxGrens(max_pct) { return this.call("/verbruik/grens", { method: "POST", body: { max_pct } }); },
 };
