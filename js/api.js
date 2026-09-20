@@ -34,4 +34,6 @@ const Api = {
   wbso(jaar) { return this.call("/instellingen/wbso" + (jaar ? "?jaar=" + jaar : "")); },
   wbsoZet(jaar, projecten) { return this.call("/instellingen/wbso", { method: "POST", body: { jaar, projecten } }); },
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },
+  verbruik(dagen = 14) { return this.call("/verbruik?dagen=" + dagen); },
+  verbruikGrens(tokens_week) { return this.call("/verbruik/grens", { method: "POST", body: { tokens_week } }); },
 };

@@ -376,6 +376,31 @@ const App = {
     });
   },
 
+  /* ============================== VERBRUIK ============================== */
+  async rVerbruik(el, dagen = 14) {
+    let v;
+    try { v = await Api.verbruik(dagen); } catch (e) { el.innerHTML = `<p class="stil">${esc(e.message)}</p>`; return; }
+    const w = v.week || {}, d = v.vandaag || {};
+    const grens = v.grens_tokens_week || 0;
+    const deel = grens ? Math.min(100, Math.round((w.tokens || 0) / grens * 100)) : 0;
+    const top = Math.max(1, ...(v.per_dag || []).map((x) => x.tokens || 0));
+    const staafKleur = deel >= 100 ? "rood" : deel >= 80 ? "oranje" : "grijs";
+    el.innerHTML = `
+      <p class="stil">Vandaag ${tok(d.tokens)} in ${d.runs || 0} run(s). Deze week ${tok(w.tokens)} in ${w.runs || 0} run(s).</p>
+      ${grens ? `<div class="meter"><div class="meter-vul ${staafKleur}" style="width:${deel}%"></div></div>
+        <p class="hint">${deel}% van je weekgrens (${tok(grens)}).${deel >= 80 ? " Assistent slaat niet-urgente runs over zodra de grens vol is." : ""}</p>` : ""}
+      <div class="dagstaven">${(v.per_dag || []).map((x) => `<span class="dagstaaf" title="${esc(x.dag)}: ${tok(x.tokens)}"><i style="height:${Math.round((x.tokens || 0) / top * 100)}%"></i></span>`).join("")}</div>
+      ${v.per_soort?.length ? `<ul class="status-lijst">${v.per_soort.map((x) => `<li>${esc(x.soort)}: ${tok(x.tokens)} in ${x.runs} run(s)${x.runs ? ` (${tok(Math.round(x.tokens / x.runs))} per run)` : ""}</li>`).join("")}</ul>` : ""}
+      ${w.cache_ratio != null ? `<p class="hint">Cache-hit ${Math.round(w.cache_ratio * 100)}%. Lager dan ~70% betekent dat de context elke run opnieuw wordt opgebouwd.</p>` : ""}
+      <div class="rij"><label>Weekgrens <input id="verbruik-grens" type="number" min="0" step="100000" value="${grens}" inputmode="numeric"></label><button type="button" id="verbruik-opslaan" class="btn-primary">Opslaan</button></div>
+      <div class="chips">${[7, 14, 30].map((n) => `<button type="button" class="chip ${n === dagen ? "actief" : ""}" data-dagen="${n}">${n} dagen</button>`).join("")}</div>`;
+    el.querySelectorAll(".chip[data-dagen]").forEach((b) => b.addEventListener("click", () => this.rVerbruik(el, parseInt(b.dataset.dagen, 10))));
+    el.querySelector("#verbruik-opslaan").addEventListener("click", async () => {
+      try { await Api.verbruikGrens(parseInt(el.querySelector("#verbruik-grens").value, 10) || 0); this.toast("Weekgrens opgeslagen"); this.rVerbruik(el, dagen); }
+      catch (e) { this.toast(e.message, { fout: true }); }
+    });
+  },
+
   /* ============================ INSTELLINGEN ============================ */
   async rInstellingen(m) {
     const c = await Opslag.instellingen();
@@ -406,6 +431,10 @@ const App = {
         <div id="install-manual" class="hint hidden">Installeren: open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</div>
         <div class="rij"><button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button></div>
       </section>
+      <details class="card klein" id="verbruik-sectie">
+        <summary><h2>Verbruik</h2><span class="hint">Wat de assistent zelf aan Claude opmaakt.</span></summary>
+        <div id="verbruik-inhoud"><p class="stil">Laden…</p></div>
+      </details>
       <details class="card klein" id="wbso-sectie">
         <summary><h2>WBSO-projecten</h2><span class="hint">Eens per jaar: welke projecten tellen mee voor de 500 uur.</span></summary>
         <div id="wbso-inhoud"><p class="stil">Laden…</p></div>
@@ -437,6 +466,7 @@ const App = {
     m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} bijgewerkt, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); const o = r.opschoon || {}; this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${(r.dubbel || 0) + (o.samengevoegd || 0)} samengevoegd, ${(r.afgerond || 0) + (o.afgerond || 0)} afgerond, ${o.hernoemd || 0} bijgewerkt`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
+    m.querySelector("#verbruik-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rVerbruik(m.querySelector("#verbruik-inhoud")); }, { once: false });
     m.querySelector("#wbso-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rWbso(m.querySelector("#wbso-inhoud")); }, { once: false });
     m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },
@@ -458,6 +488,7 @@ const App = {
   },
 };
 
+function tok(n) { n = n || 0; return n >= 1e6 ? (n / 1e6).toFixed(1).replace(".", ",") + "M tokens" : n >= 1e3 ? Math.round(n / 1e3) + "k tokens" : n + " tokens"; }
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function prioKlasse(p) { return Math.min(4, Math.floor((p || 0) / 25)); }
 function datumKort(iso) { const d = new Date(iso.slice(0, 10) + "T12:00:00"); return d.toLocaleDateString("nl-NL", { weekday: "short", day: "numeric", month: "short" }); }
