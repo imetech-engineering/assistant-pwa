@@ -380,37 +380,51 @@ const App = {
   async rVerbruik(el, dagen = 14) {
     let v;
     try { v = await Api.verbruik(dagen); } catch (e) { el.innerHTML = `<p class="stil">${esc(e.message)}</p>`; return; }
-    const w = v.week || {}, d = v.vandaag || {};
-    const grens = v.grens_tokens_week || 0;
-    const deel = grens ? Math.min(100, Math.round((w.tokens || 0) / grens * 100)) : 0;
-    const top = Math.max(1, ...(v.per_dag || []).map((x) => x.tokens || 0));
-    const staafKleur = deel >= 100 ? "rood" : deel >= 80 ? "oranje" : "grijs";
-    const mx = v.max || {}, mg = v.grens_max_pct || 0;
-    const mKleur = (p) => (mg && p >= mg) ? "rood" : (mg && p >= 0.8 * mg) ? "oranje" : "grijs";
+    const mx = v.max || {}, a = v.aandeel, mg = v.grens_max_pct || 0;
     const wanneer = (s) => s ? datumKort(s) + " " + s.slice(11, 16) : "";
+    const pct = (x) => (Math.round(x * 10) / 10).toString().replace(".", ",") + "%";
+    const namen = { ochtendbriefing: "Ochtendbriefing", avondcheck: "Avondcheck", triage: "Triage", chat: "Chat", opdracht: "Opdrachten", logboek: "Logboek", overig: "Overig" };
+    const totaal = mx.week_pct, assist = a && !a.leert ? a.assistent_pct : null;
+
+    let kop, balk = "", legenda = "";
+    if (totaal == null) {
+      kop = `<p class="verbruik-kop">${v.max ? "Weekvenster is net gereset" : "Nog geen meting"}</p><p class="hint">Het volgende getal komt mee met de volgende run van de assistent.</p>`;
+    } else {
+      kop = assist != null
+        ? `<p class="verbruik-kop">Assistent ≈ ${Math.round(a.aandeel * 100)}% van je Claude-gebruik</p>
+           <p class="hint">Schatting, marge ±${Math.max(1, Math.round(a.marge * a.aandeel * 100))} procentpunt. Wordt nauwkeuriger naarmate er meer metingen zijn.</p>`
+        : `<p class="verbruik-kop">Aandeel assistent: nog aan het leren</p>
+           <p class="hint">Na een paar dagen metingen (${a ? a.stappen : 0} van minimaal 3) komt hier een schatting.</p>`;
+      balk = `<div class="stapel" role="img" aria-label="Max-week ${totaal}%, waarvan assistent ${assist != null ? pct(assist) : "onbekend"}">
+          ${assist != null ? `<span class="stapel-assist" style="width:${Math.min(100, assist)}%"></span>` : ""}
+          <span class="stapel-rest" style="width:${Math.max(0, Math.min(100, totaal) - (assist || 0))}%"></span>
+          ${mg ? `<span class="stapel-rem" style="left:${mg}%" title="Rem bij ${mg}%"></span>` : ""}
+        </div>`;
+      legenda = `<div class="legenda">
+          ${assist != null ? `<span><i class="stip assist"></i>Assistent ${pct(assist)}</span>` : ""}
+          <span><i class="stip rest"></i>${assist != null ? "Rest " + pct(totaal - assist) : "Totaal " + totaal + "%"}</span>
+          ${mg ? `<span><i class="stip rem"></i>Rem ${mg}%</span>` : ""}
+        </div>
+        <p class="hint">Van je Max-week${mx.week_reset ? `, reset ${esc(wanneer(mx.week_reset))}` : ""}. Gemeten ${esc(wanneer(mx.gemeten))}.</p>`;
+    }
+
+    const soorten = (v.per_soort || []).filter((x) => x.aandeel > 0);
+    const topDag = Math.max(1e-9, ...(v.per_dag || []).map((x) => x.kosten_usd || 0));
+    const dagen_ = v.per_dag || [];
     el.innerHTML = `
-      <p class="stil"><strong>Claude Max</strong> (hele account: chat, Cowork, Claude Code en de assistent samen)</p>
-      ${mx.week_pct != null ? `<div class="meter"><div class="meter-vul ${mKleur(mx.week_pct)}" style="width:${Math.min(100, mx.week_pct)}%"></div></div>
-        <p class="hint">Week ${mx.week_pct}%${mx.week_reset ? `, reset ${esc(wanneer(mx.week_reset))}` : ""}.${mx.vijf_uur_pct != null ? ` 5 uur: ${mx.vijf_uur_pct}%.` : ""} Gemeten ${esc(wanneer(mx.gemeten))}, bij de laatste run van de assistent.</p>`
-        : `<p class="hint">${v.max ? "Weekvenster is gereset sinds de laatste meting; nieuw getal na de volgende run." : "Nog geen meting; komt mee met de volgende run van de assistent."}</p>`}
-      <div class="rij"><label>Rem bij Max-week % <input id="verbruik-max" type="number" min="0" max="100" step="5" value="${mg}" inputmode="numeric"></label><button type="button" id="verbruik-max-opslaan" class="btn-primary">Opslaan</button></div>
-      <p class="hint">Boven dit percentage slaat de assistent geplande rondes over. Chat en opdrachten blijven werken. 0 = uit.</p>
-      <p class="stil"><strong>Assistent zelf</strong></p>
-      <p class="stil">Vandaag ${tok(d.tokens)} in ${d.runs || 0} run(s). Deze week ${tok(w.tokens)} in ${w.runs || 0} run(s).</p>
-      ${grens ? `<div class="meter"><div class="meter-vul ${staafKleur}" style="width:${deel}%"></div></div>
-        <p class="hint">${deel}% van je weekgrens (${tok(grens)}).${deel >= 80 ? " Assistent slaat niet-urgente runs over zodra de grens vol is." : ""}</p>` : ""}
-      <div class="dagstaven">${(v.per_dag || []).map((x) => `<span class="dagstaaf" title="${esc(x.dag)}: ${tok(x.tokens)}"><i style="height:${Math.round((x.tokens || 0) / top * 100)}%"></i></span>`).join("")}</div>
-      ${v.per_soort?.length ? `<ul class="status-lijst">${v.per_soort.map((x) => `<li>${esc(x.soort)}: ${tok(x.tokens)} in ${x.runs} run(s)${x.runs ? ` (${tok(Math.round(x.tokens / x.runs))} per run)` : ""}</li>`).join("")}</ul>` : ""}
-      ${w.cache_ratio != null ? `<p class="hint">Cache-hit ${Math.round(w.cache_ratio * 100)}%. Lager dan ~70% betekent dat de context elke run opnieuw wordt opgebouwd.</p>` : ""}
-      <div class="rij"><label>Weekgrens <input id="verbruik-grens" type="number" min="0" step="100000" value="${grens}" inputmode="numeric"></label><button type="button" id="verbruik-opslaan" class="btn-primary">Opslaan</button></div>
-      <div class="chips">${[7, 14, 30].map((n) => `<button type="button" class="chip ${n === dagen ? "actief" : ""}" data-dagen="${n}">${n} dagen</button>`).join("")}</div>`;
+      ${kop}${balk}${legenda}
+      ${soorten.length ? `<h3 class="verbruik-sub">Waar het in zit</h3>
+        <div class="soorten">${soorten.map((x) => `<div class="soort"><span>${esc(namen[x.soort] || x.soort)}</span><span class="soort-balk"><i style="width:${Math.round(x.aandeel * 100)}%"></i></span><b>${Math.round(x.aandeel * 100)}%</b></div>`).join("")}</div>` : ""}
+      <h3 class="verbruik-sub">Per dag</h3>
+      <div class="dagstaven">${dagen_.map((x) => `<span class="dagstaaf" title="${esc(datumKort(x.dag))}"><i style="height:${Math.round((x.kosten_usd || 0) / topDag * 100)}%"></i></span>`).join("")}</div>
+      ${dagen_.length ? `<div class="dag-as"><span>${esc(datumKort(dagen_[0].dag))}</span><span>vandaag</span></div>` : ""}
+      <div class="chips">${[7, 14, 30].map((n) => `<button type="button" class="chip ${n === dagen ? "actief" : ""}" data-dagen="${n}">${n} dagen</button>`).join("")}</div>
+      <h3 class="verbruik-sub">Rem</h3>
+      <div class="invoer-rij"><label for="verbruik-max">Geplande rondes overslaan boven</label><span class="getal"><input id="verbruik-max" type="number" min="0" max="100" step="5" value="${mg}" inputmode="numeric"><span>%</span></span><button type="button" id="verbruik-max-opslaan" class="btn-primary">Opslaan</button></div>
+      <p class="hint">Van je hele Max-week. Chat en opdrachten blijven altijd werken. 0 = uit.</p>`;
     el.querySelectorAll(".chip[data-dagen]").forEach((b) => b.addEventListener("click", () => this.rVerbruik(el, parseInt(b.dataset.dagen, 10))));
     el.querySelector("#verbruik-max-opslaan").addEventListener("click", async () => {
       try { await Api.verbruikMaxGrens(parseInt(el.querySelector("#verbruik-max").value, 10) || 0); this.toast("Rem opgeslagen"); this.rVerbruik(el, dagen); }
-      catch (e) { this.toast(e.message, { fout: true }); }
-    });
-    el.querySelector("#verbruik-opslaan").addEventListener("click", async () => {
-      try { await Api.verbruikGrens(parseInt(el.querySelector("#verbruik-grens").value, 10) || 0); this.toast("Weekgrens opgeslagen"); this.rVerbruik(el, dagen); }
       catch (e) { this.toast(e.message, { fout: true }); }
     });
   },
@@ -446,7 +460,7 @@ const App = {
         <div class="rij"><button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button></div>
       </section>
       <details class="card klein" id="verbruik-sectie">
-        <summary><h2>Verbruik</h2><span class="hint">Je Claude Max-week en wat de assistent zelf opmaakt.</span></summary>
+        <summary><h2>Verbruik</h2><span class="hint">Hoeveel van je Claude-gebruik door de assistent komt.</span></summary>
         <div id="verbruik-inhoud"><p class="stil">Laden…</p></div>
       </details>
       <details class="card klein" id="wbso-sectie">
