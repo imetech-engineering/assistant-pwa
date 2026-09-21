@@ -13,6 +13,14 @@ const App = {
     document.querySelectorAll(".bottom-nav button").forEach((b) => b.addEventListener("click", () => this.ga(b.dataset.tab)));
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e));
+      // Nieuwe versie actief: melden met één tik om te vernieuwen (zelfde als in de andere IMeTech-apps)
+      const eersteKeer = !navigator.serviceWorker.controller;
+      let gemeld = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (eersteKeer || gemeld) return;
+        gemeld = true;
+        this.toast("Nieuwe versie klaar", { ongedaan: () => location.reload(), knop: "Vernieuwen", blijf: true });
+      });
       navigator.serviceWorker.addEventListener("message", (e) => {
         if (e.data?.type === "vernieuw") this.render();
         if (e.data?.type === "open_item") { this.project = null; this.ga("overzicht"); }
@@ -77,8 +85,9 @@ const App = {
     el.classList.remove("hidden"); el.classList.toggle("fout", !!opties.fout);
     this._toastActie = opties.ongedaan || null;
     knop.classList.toggle("hidden", !opties.ongedaan);
+    knop.textContent = opties.knop || "Herstel";
     clearTimeout(this._toastT);
-    this._toastT = setTimeout(() => el.classList.add("hidden"), opties.ongedaan ? 8000 : 3500);
+    this._toastT = setTimeout(() => el.classList.add("hidden"), opties.blijf ? 20000 : opties.ongedaan ? 8000 : 3500);
     try { navigator.vibrate?.(opties.fout ? [40, 60, 40] : 25); } catch (_) {}
   },
 
@@ -185,6 +194,8 @@ const App = {
         <button type="button" class="chip" data-vraag="Hoe ziet morgen eruit?">Morgen</button>
         <button type="button" class="chip" data-vul="Zet een mailconcept klaar naar ">Mailconcept…</button>
         <button type="button" class="chip" data-vul="Bereid mijn meeting voor met ">Meeting voorbereiden…</button>
+        <button type="button" class="chip" data-vul="Maak een offerte voor ">Offerte…</button>
+        <button type="button" class="chip" data-vul="Nieuw project: ">Nieuw project…</button>
       </div>
       <div id="gesprek" class="gesprek">${this.gesprek.map((b) => this.belHtml(b)).join("")}</div>
       <p id="dicteer-hint" class="hint hidden"></p>
@@ -233,7 +244,7 @@ const App = {
   },
 
   belHtml(b) {
-    const label = { opdracht: "In de wachtrij: ", opdracht_wijzig: "Opdracht bijgewerkt: ", opdracht_annuleer: "Opdracht geannuleerd: ", done: "Afgevinkt: ", dismiss: "Weg: ", snooze: "Uitgesteld: ", due: "Deadline gezet: ", hernoem: "Hernoemd: ", wacht: "Wacht op antwoord: ", houd: "Blijft staan: ", nieuw: "Toegevoegd: ", reopen: "Teruggezet: ", parkeer: "Geparkeerd: ", geweigerd: "Niet uitgevoerd: " };
+    const label = { opdracht: "In de wachtrij: ", opdracht_wijzig: "Opdracht bijgewerkt: ", opdracht_annuleer: "Opdracht geannuleerd: ", done: "Afgevinkt: ", dismiss: "Weg: ", snooze: "Uitgesteld: ", due: "Deadline gezet: ", hernoem: "Hernoemd: ", wacht: "Wacht op antwoord: ", houd: "Blijft staan: ", nieuw: "Toegevoegd: ", reopen: "Teruggezet: ", parkeer: "Geparkeerd: ", nieuw_project: "Project aangemaakt: ", geweigerd: "Niet uitgevoerd: " };
     const chip = (a) => { const opd = a.actie.startsWith("opdracht"), nee = a.actie === "geweigerd"; return `<span class="tag ${nee ? "rood" : opd ? "oranje" : "groen"}">${IC(nee ? "ic-sluiten" : opd ? "ic-klok" : "ic-vink")} ${label[a.actie] || ""}${esc(a.titel)}</span>`; };
     return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map(chip).join("")}</div>` : ""}</div>`;
   },
@@ -446,8 +457,15 @@ const App = {
       const l = tel(); if (!l.length) return;
       knop.disabled = true; knop.textContent = "Bezig met schrijven…";
       try {
-        const r = await Api.urenSchrijf(l.map(({ aan, el, ...x }) => x));
-        this.toast(r.ok ? `${r.geschreven} ${r.geschreven === 1 ? "regel" : "regels"} geschreven` : `${r.geschreven || 0} van ${r.totaal || l.length} geschreven${r.fout ? ": " + r.fout : ""}`, r.ok ? {} : { fout: true });
+        const regels = l.map(({ aan, el, ...x }) => x);
+        const r = await Api.urenSchrijf(regels);
+        const r2r = regels.filter((x) => (/r2r/i.test(x.opdrachtgever || "") || /^\s*60\d\d/.test(x.project || "")) && Number(x.tarief) > 0);
+        const tekst = r.ok ? `${r.geschreven} ${r.geschreven === 1 ? "regel" : "regels"} geschreven` : `${r.geschreven || 0} van ${r.totaal || l.length} geschreven${r.fout ? ": " + r.fout : ""}`;
+        if (r.ok && r2r.length) {
+          this.toast(`${tekst}. ${r2r.length} R2R-${r2r.length === 1 ? "regel" : "regels"} ook in Timetick?`, { knop: "Timetick", blijf: true, ongedaan: async () => {
+            try { await Api.urenTimetick(r2r); this.toast("Wordt binnen een uur in Timetick gezet; je krijgt een melding"); } catch (e) { this.toast(e.message, { fout: true }); }
+          } });
+        } else this.toast(tekst, r.ok ? {} : { fout: true });
         this.checkStatus(); this.render();
       } catch (e) { this.toast(e.message, { fout: true }); tel(); }
     });

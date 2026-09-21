@@ -38,6 +38,7 @@ const Api = {
   verbruikGrens(tokens_week) { return this.call("/verbruik/grens", { method: "POST", body: { tokens_week } }); },
   urenVoorstel() { return this.call("/uren/voorstel"); },
   urenMeet() { return this.call("/uren/voorstel", { method: "POST" }); },
+  urenTimetick(regels) { return this.call("/uren/timetick", { method: "POST", body: { regels } }); },
   urenSchrijf(regels) { return this.call("/uren/schrijf", { method: "POST", body: { regels } }); },
   verbruikMaxGrens(max_pct) { return this.call("/verbruik/grens", { method: "POST", body: { max_pct } }); },
 };
