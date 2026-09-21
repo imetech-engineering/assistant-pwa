@@ -19,7 +19,7 @@ const App = {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         if (eersteKeer || gemeld) return;
         gemeld = true;
-        this.toast("Nieuwe versie klaar", { ongedaan: () => location.reload(), knop: "Vernieuwen", blijf: true });
+        this.toast("Nieuwe versie klaar", { ongedaan: () => (window.IMeTechHerlaad || (() => location.reload()))(), knop: "Vernieuwen", blijf: true });
       });
       navigator.serviceWorker.addEventListener("message", (e) => {
         if (e.data?.type === "vernieuw") this.render();
