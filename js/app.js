@@ -123,6 +123,17 @@ const App = {
 
   async render() {
     const m = document.getElementById("scherm");
+    // Terugknop: eerst uren of projectdetail dicht, dan terug naar Assistent.
+    if (window.Terug) {
+      Terug.sluiter("tab", () => { this.project = null; this.ga("assistent"); });
+      Terug.sluiter("project", () => { this.project = null; this.render(); });
+      Terug.sluiter("uren", () => { this.urenOpen = false; this.render(); });
+      Terug.sync([
+        this.tab !== "assistent" && "tab",
+        this.tab === "overzicht" && this.project && "project",
+        this.tab === "assistent" && this.urenOpen && "uren",
+      ]);
+    }
     try {
       if (this.tab === "assistent") await this.rAssistent(m);
       else if (this.tab === "overzicht") await (this.project ? this.rProject(m) : this.rOverzicht(m));
