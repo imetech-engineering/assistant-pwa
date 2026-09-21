@@ -36,5 +36,8 @@ const Api = {
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },
   verbruik(dagen = 14) { return this.call("/verbruik?dagen=" + dagen); },
   verbruikGrens(tokens_week) { return this.call("/verbruik/grens", { method: "POST", body: { tokens_week } }); },
+  urenVoorstel() { return this.call("/uren/voorstel"); },
+  urenMeet() { return this.call("/uren/voorstel", { method: "POST" }); },
+  urenSchrijf(regels) { return this.call("/uren/schrijf", { method: "POST", body: { regels } }); },
   verbruikMaxGrens(max_pct) { return this.call("/verbruik/grens", { method: "POST", body: { max_pct } }); },
 };

@@ -266,6 +266,21 @@ details.card.klein[open] > summary h2::before { content: "▾ "; }
 details.card.klein #wbso-inhoud { margin-top: 10px; }
 #wbso-lijst { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; max-height: 220px; overflow-y: auto; }
 .agenda li.voorbij { opacity: .45; text-decoration: line-through; }
+.agenda li.met-briefje { cursor: pointer; }
+.agenda .briefje-hint { color: var(--accent); white-space: nowrap; }
+.agenda li.briefje { display: block; border-top: 0; padding: 2px 0 10px 106px; font-size: 0.875rem; }
+.agenda li.briefje ul { margin: 4px 0; padding-left: 18px; }
+.agenda li.briefje p { margin: 2px 0; }
+@media (max-width: 420px) { .agenda li.briefje { padding-left: 0; } }
+.btn-link.terug .ic { transform: rotate(180deg); }
+.uren-kaart { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; color: var(--text-primary); }
+.uren-kaart span { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.uren-kaart small { color: var(--text-secondary); }
+.uren-rij { display: flex; flex-direction: column; gap: 6px; padding: 10px 0; border-top: 1px solid var(--border); }
+.uren-rij .uren-kop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; }
+.uren-rij .uren-getal { display: flex; align-items: center; gap: 8px; }
+.uren-rij .uren-getal input { width: 6em; flex: 0 0 6em; text-align: right; }
+.uren-rij .uren-getal small { color: var(--text-tertiary); }
 
 /* Lange teksten nooit buiten beeld: chatbellen, actiechips, agendaregels, toast */
 .bel { overflow-wrap: anywhere; min-width: 0; }

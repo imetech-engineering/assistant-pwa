@@ -1,7 +1,7 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v24";
+const CACHE = "assistent-v25";
 const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
@@ -19,7 +19,8 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data.json(); } catch (_) { d = { titel: "Assistent", body: e.data ? e.data.text() : "" }; }
-  const acties = d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
+  const acties = d.soort === "vertrek" ? [{ action: "route", title: "Route" }]
+    : d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
     : d.soort === "stil" ? [{ action: "houd", title: "Laten staan" }, { action: "dismiss", title: "Weg" }]
     : d.soort === "logboek" && d.opdracht ? [{ action: "opdracht", title: "Ja, verwerken" }]
     : d.acties && d.concept ? [{ action: "done", title: "Gedaan" }, { action: "concept", title: "Concept klaarzetten" }]
@@ -45,10 +46,15 @@ self.addEventListener("notificationclick", (e) => {
     e.waitUntil(actie(d.item_id, e.action, d.melding_id));
     return;
   }
+  if (d.url) {   // vertrekmelding: route openen
+    e.waitUntil(self.clients.openWindow(d.url));
+    return;
+  }
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
-    const doel = new URL("./?tab=" + (d.item_id ? "open" : "vandaag"), self.registration.scope).href;
+    const uren = d.soort === "uren";
+    const doel = new URL("./?tab=" + (d.item_id ? "overzicht" : "assistent") + (uren ? "&uren=1" : ""), self.registration.scope).href;
     const c = cs.find(x => x.url.startsWith(self.registration.scope));
-    if (c) { c.focus(); c.postMessage({ type: d.item_id ? "open_item" : "vernieuw", item_id: d.item_id }); return; }
+    if (c) { c.focus(); c.postMessage({ type: uren ? "uren" : d.item_id ? "open_item" : "vernieuw", item_id: d.item_id }); return; }
     return self.clients.openWindow(doel);
   }));
 });

@@ -16,13 +16,17 @@ const App = {
       navigator.serviceWorker.addEventListener("message", (e) => {
         if (e.data?.type === "vernieuw") this.render();
         if (e.data?.type === "open_item") { this.project = null; this.ga("overzicht"); }
+        if (e.data?.type === "uren") { this.urenOpen = true; this.ga("assistent"); }
       });
     }
     this.laadThema();
     Installatie.init((tab) => this.ga(tab));
     document.getElementById("toast-knop").addEventListener("click", () => this._toastActie?.());
     const params = new URLSearchParams(location.search);
-    if (params.get("tab")) this.tab = params.get("tab");
+    if (params.get("tab")) this.tab = params.get("tab") === "vandaag" ? "assistent" : params.get("tab");
+    if (params.get("uren")) this.urenOpen = true;
+    window.addEventListener("online", () => this.verstuurWachtrij());
+    setTimeout(() => this.verstuurWachtrij(), 1500);
     this.ga(this.tab);
     this.checkStatus();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) { this.checkStatus(); this.render(); } });
@@ -119,6 +123,7 @@ const App = {
 
   /* ============================ ASSISTENT ============================ */
   async rAssistent(m) {
+    if (this.urenOpen) return this.rUren(m);
     const v = await Api.vandaag();
     this.cache.vandaag = v;
     document.getElementById("badge").textContent = v.aantal_open || "";
@@ -150,8 +155,9 @@ const App = {
       <section class="card groet">
         <div class="groet-kop">${IC("ic-assistent")}<b>${groet}, ${naam}.</b></div>
         <p>${zin}</p>
-        ${lijst.length ? `${lijstKop}<ul class="agenda">${lijst.map((a) => `<li class="${!avond && voorbij(a) ? "voorbij" : ""}"><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span><span>${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}</span></li>`).join("")}</ul>` : ""}
+        ${lijst.length ? `${lijstKop}<ul class="agenda">${lijst.map((a) => { const b = !avond && (v.briefjes || {})[`${a.van}|${(a.titel || "").slice(0, 60)}`]; return `<li class="${!avond && voorbij(a) ? "voorbij" : ""}${b ? " met-briefje" : ""}"${b ? ` data-briefje="1"` : ""}><span class="tijd">${a.hele_dag ? "hele dag" : a.van + "–" + a.tot}</span><span>${esc(a.titel)}${a.locatie ? ` <small>${esc(a.locatie)}</small>` : ""}${b ? ` <small class="briefje-hint">${IC("ic-chevron")} spiekbriefje</small>` : ""}</span></li>${b ? `<li class="briefje hidden"><div>${b.doel ? `<p><b>${esc(b.doel)}</b></p>` : ""}<ul>${(b.punten || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul><p class="stil">${esc(b.bron || "")}${b.link ? ` · <a href="${esc(b.link)}" target="_blank" rel="noopener">openen</a>` : ""}</p></div></li>` : ""}`; }).join("")}</ul>` : ""}
       </section>
+      ${v.uren_open?.aantal ? `<button type="button" class="card uren-kaart" id="uren-open">${IC("ic-klok")}<span><b>Uren nakijken</b><small>${String(v.uren_open.uren).replace(".", ",")} u nog te schrijven (${v.uren_open.aantal} ${v.uren_open.aantal === 1 ? "regel" : "regels"})</small></span>${IC("ic-chevron")}</button>` : ""}
       ${v.top.length ? `<h2>Nu belangrijk</h2><div id="top">${v.top.slice(0, 3).map((it) => this.itemRij(it)).join("")}</div>
         <button type="button" class="btn-link" id="naar-overzicht">Alle ${v.aantal_open} open punten ${IC("ic-chevron")}</button>` : ""}
       ${(v.opdrachten || []).length ? `<h2>Opdrachten</h2>${v.opdrachten.map((o) => this.opdrachtRij(o)).join("")}` : ""}
@@ -173,6 +179,8 @@ const App = {
       </div>`;
     this.bindItems(m);
     m.querySelector("#naar-overzicht")?.addEventListener("click", () => { this.project = null; this.ga("overzicht"); });
+    m.querySelectorAll(".agenda li[data-briefje]").forEach((li) => li.addEventListener("click", () => li.nextElementSibling?.classList.toggle("hidden")));
+    m.querySelector("#uren-open")?.addEventListener("click", () => { this.urenOpen = true; this.render(); });
     m.querySelectorAll(".chip[data-vraag]").forEach((c) => c.addEventListener("click", () => this.stuur(c.dataset.vraag, false)));
     m.querySelectorAll(".chip[data-vul]").forEach((c) => c.addEventListener("click", () => { const i = m.querySelector("#vraag-tekst"); i.value = c.dataset.vul; i.focus(); }));
     m.querySelectorAll("[data-opdracht-annuleer]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtAnnuleer(b.dataset.opdrachtAnnuleer); this.toast("Opdracht geannuleerd"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
@@ -274,11 +282,104 @@ const App = {
       if (viaSpraak || inst.stem !== false) Spraak.spreek(r.antwoord, inst.stemNaam);
       if (r.acties?.length) { this.checkStatus(); if (this.tab === "assistent") setTimeout(() => this.render(), r.acties.some((a) => a.actie === "opdracht") ? 1500 : 400); }
     } catch (e) {
-      Object.assign(wacht, { tekst: "Dat lukte even niet: " + e.message, wacht: false, fout: true });
+      if (!navigator.onLine || e instanceof TypeError) {   // geen verbinding: bewaren en later versturen
+        this.zetInWachtrij(tekst);
+        Object.assign(wacht, { tekst: "Geen verbinding. Ik heb het bewaard en stuur het zodra je weer bereik hebt.", wacht: false });
+      } else Object.assign(wacht, { tekst: "Dat lukte even niet: " + e.message, wacht: false, fout: true });
     }
     if (this.gesprek.length > 30) this.gesprek = this.gesprek.slice(-30);
     if (this.tab === "assistent") { const g2 = document.getElementById("gesprek"); if (g2) { g2.innerHTML = this.gesprek.map((b) => this.belHtml(b)).join(""); this.scrollGesprek(); } }
     console.debug("antwoord in", Date.now() - t0, "ms");
+  },
+
+  /* Offline: ingesproken of getypte berichten zonder bereik bewaren en later versturen. */
+  wachtrij() { try { return JSON.parse(localStorage.getItem("chat_wachtrij") || "[]"); } catch (_) { return []; } },
+  zetWachtrij(l) { try { localStorage.setItem("chat_wachtrij", JSON.stringify(l)); } catch (_) {} },
+  zetInWachtrij(tekst) { const l = this.wachtrij(); l.push({ tekst, at: new Date().toISOString() }); this.zetWachtrij(l); },
+  async verstuurWachtrij() {
+    if (this._wachtrijBezig || !navigator.onLine) return;
+    const l = this.wachtrij(); if (!l.length) return;
+    this._wachtrijBezig = true;
+    try {
+      while (l.length) {
+        const m = l[0];
+        let r;
+        try { r = await Api.chat(m.tekst); } catch (e) { if (e instanceof TypeError) break; r = { antwoord: "Niet gelukt: " + e.message }; }
+        l.shift(); this.zetWachtrij(l);
+        const tijd = new Date(m.at).toTimeString().slice(0, 5);
+        this.gesprek.push({ rol: "user", tekst: `${m.tekst} (bewaard om ${tijd})` }, { rol: "assistant", tekst: r.antwoord, acties: r.acties });
+      }
+      this.toast("Bewaarde berichten verstuurd");
+      if (this.tab === "assistent") this.render();
+    } finally { this._wachtrijBezig = false; }
+  },
+
+  /* ============================ UREN ============================ */
+  async rUren(m) {
+    m.innerHTML = `<p class="stil">Urenvoorstel ophalen…</p>`;
+    let d;
+    try { d = await Api.urenVoorstel(); } catch (e) { m.innerHTML = `<p class="fout">${esc(e.message)}</p>`; return; }
+    const v = d.voorstel || {}, hist = d.historie || [];
+    const perProject = Object.fromEntries(hist.map((h) => [h.project, h]));
+    const regels = (v.regels || []);
+    const open = regels.filter((r) => ["schrijven", "aanvullen"].includes(r.status) && r.voorstel_uren > 0 && !r.geschreven_via_app);
+    const rest = regels.filter((r) => !open.includes(r));
+    const dagNaam = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("nl-NL", { weekday: "short", day: "2-digit", month: "2-digit" });
+    const n = (x) => String(x ?? 0).replace(".", ",");
+    const rij = (r, i) => `
+      <div class="uren-rij" data-i="${i}">
+        <label class="uren-kop"><input type="checkbox" checked data-veld="aan"> <b>${dagNaam(r.datum)}</b> ${r.blok === "avond" ? "(avond)" : ""} ${r.status === "aanvullen" ? `<span class="tag oranje">aanvulling, al ${n(r.geschreven)} u</span>` : ""}${r.marge ? ` <small>marge ${esc(r.marge)}</small>` : ""}</label>
+        <input list="uren-projecten" data-veld="project" value="${esc(r.project || "")}" placeholder="Project">
+        <input data-veld="werkzaamheden" value="${esc(r.werkzaamheden || "")}" placeholder="Werkzaamheden">
+        <div class="uren-getal"><input type="number" inputmode="decimal" step="0.25" min="0" data-veld="uren" value="${r.voorstel_uren}"> uur <small>gemeten ${n(r.gemeten)}</small></div>
+      </div>`;
+    m.innerHTML = `
+      <button type="button" class="btn-link terug" id="uren-terug">${IC("ic-chevron")} Terug</button>
+      <h2>Uren sinds ${v.gisteren ? dagNaam(v.gisteren) + " 17:00" : "gisteren"}</h2>
+      ${v.voetnoot ? `<p class="hint">⚠️ ${esc(v.voetnoot)}</p>` : ""}
+      ${open.length ? `<div id="uren-lijst">${open.map(rij).join("")}</div>` : `<p>Alles geschreven ✅</p>`}
+      <datalist id="uren-projecten">${hist.map((h) => `<option value="${esc(h.project)}">`).join("")}</datalist>
+      <div class="acties">
+        <button type="button" id="uren-regel">${IC("ic-plus")} Regel toevoegen</button>
+        <button type="button" id="uren-meet">${IC("ic-herstel")} Opnieuw meten</button>
+      </div>
+      ${rest.length ? `<h2>Al geschreven</h2><ul class="agenda">${rest.map((r) => `<li><span class="tijd">${dagNaam(r.datum)}</span><span>${r.geschreven_via_app ? "✅ zojuist" : r.status === "alleen_geschreven" ? "📝" : "✅"} ${esc(r.project)} ${n(r.geschreven_via_app ? r.voorstel_uren : r.geschreven)} u</span></li>`).join("")}</ul>` : ""}
+      <p class="stil">Bestaande regels in je urenadministratie worden nooit aangepast; een aanvulling komt als extra regel.</p>
+      <div class="invoer-balk"><button type="button" class="btn-primary" id="uren-schrijf" ${open.length ? "" : "disabled"}>Schrijf in één keer</button></div>`;
+    const lijst = m.querySelector("#uren-lijst");
+    const lees = () => [...m.querySelectorAll(".uren-rij")].map((el) => {
+      const r = el.dataset.i !== undefined && el.dataset.i !== "nieuw" ? open[+el.dataset.i] : { datum: v.vandaag || new Date().toISOString().slice(0, 10) };
+      const w = (k) => el.querySelector(`[data-veld="${k}"]`);
+      if (!w("aan").checked) return null;
+      const project = w("project").value.trim(), h = perProject[project] || {};
+      return { id: r.id ?? null, datum: el.querySelector("[data-veld=datum]")?.value || r.datum, project,
+        opdrachtgever: r.project === project && r.opdrachtgever ? r.opdrachtgever : (h.opdrachtgever || ""),
+        locatie: r.project === project && r.locatie ? r.locatie : (h.locatie || ""),
+        tarief: r.project === project && r.tarief != null ? r.tarief : (h.tarief || 0),
+        werkzaamheden: w("werkzaamheden").value.trim(), uren: parseFloat(w("uren").value.replace(",", ".")) || 0 };
+    }).filter((r) => r && r.project && r.uren > 0);
+    const knop = m.querySelector("#uren-schrijf");
+    const tel = () => { const l = lees(); knop.textContent = l.length ? `Schrijf ${l.length} ${l.length === 1 ? "regel" : "regels"} (${n(l.reduce((s, r) => s + r.uren, 0))} u)` : "Niets geselecteerd"; knop.disabled = !l.length; };
+    m.addEventListener("input", tel); m.addEventListener("change", tel); tel();
+    m.querySelector("#uren-terug").addEventListener("click", () => { this.urenOpen = false; this.render(); });
+    m.querySelector("#uren-regel").addEventListener("click", () => {
+      const box = lijst || m.querySelector("#uren-lijst") || (() => { const d2 = document.createElement("div"); d2.id = "uren-lijst"; m.querySelector("datalist").before(d2); return d2; })();
+      box.insertAdjacentHTML("beforeend", `<div class="uren-rij" data-i="nieuw"><label class="uren-kop"><input type="checkbox" checked data-veld="aan"> <select data-veld="datum"><option value="${v.vandaag}">${v.vandaag ? dagNaam(v.vandaag) : "vandaag"}</option>${v.gisteren ? `<option value="${v.gisteren}">${dagNaam(v.gisteren)}</option>` : ""}</select></label><input list="uren-projecten" data-veld="project" placeholder="Project"><input data-veld="werkzaamheden" placeholder="Werkzaamheden"><div class="uren-getal"><input type="number" inputmode="decimal" step="0.25" min="0" data-veld="uren" value="1"> uur</div></div>`);
+      tel();
+    });
+    m.querySelector("#uren-meet").addEventListener("click", async (e) => {
+      e.target.disabled = true; this.toast("Opnieuw meten, duurt ongeveer een minuut…");
+      try { await Api.urenMeet(); this.render(); } catch (err) { this.toast(err.message, { fout: true }); e.target.disabled = false; }
+    });
+    knop.addEventListener("click", async () => {
+      const l = lees(); if (!l.length) return;
+      knop.disabled = true; knop.textContent = "Bezig met schrijven…";
+      try {
+        const r = await Api.urenSchrijf(l);
+        this.toast(r.ok ? `${r.geschreven} ${r.geschreven === 1 ? "regel" : "regels"} geschreven` : `${r.geschreven || 0} van ${r.totaal || l.length} geschreven${r.fout ? ": " + r.fout : ""}`, r.ok ? {} : { fout: true });
+        this.checkStatus(); this.render();
+      } catch (e) { this.toast(e.message, { fout: true }); tel(); }
+    });
   },
 
   /* ============================ OVERZICHT ============================ */
