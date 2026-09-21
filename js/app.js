@@ -25,6 +25,8 @@ const App = {
     const params = new URLSearchParams(location.search);
     if (params.get("tab")) this.tab = params.get("tab") === "vandaag" ? "assistent" : params.get("tab");
     if (params.get("uren")) this.urenOpen = true;
+    const deel = [params.get("deel_tekst") || params.get("deel_titel"), params.get("deel_url")].filter(Boolean);
+    if (deel.length) { this.deelTekst = [...new Set(deel)].join(" "); this.tab = "assistent"; window.IMeTechApps?.wisParams(); }
     window.addEventListener("online", () => this.verstuurWachtrij());
     setTimeout(() => this.verstuurWachtrij(), 1500);
     this.ga(this.tab);
@@ -157,7 +159,7 @@ const App = {
           <span class="ag-tijd">${a.hele_dag ? "hele dag" : `${a.van}<small>${a.tot || ""}</small>`}</span>
           <span class="ag-tekst"><b>${esc(a.titel)}</b>${a.locatie ? `<small>${esc(a.locatie)}</small>` : ""}</span>
           ${b ? `<span class="ag-brief">Spiek<i class="inst-chev"></i></span>` : ""}
-        </div>${b ? `<div class="ag-briefje hidden">${b.doel ? `<p class="ag-doel">${esc(b.doel)}</p>` : ""}<ul>${(b.punten || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul><p class="stil">${esc(b.bron || "")}${b.link ? ` · <a href="${esc(b.link)}" target="_blank" rel="noopener">openen</a>` : ""}</p></div>` : ""}`;
+        </div>${b ? `<div class="ag-briefje hidden">${b.doel ? `<p class="ag-doel">${esc(b.doel)}</p>` : ""}<ul>${(b.punten || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul><p class="stil">${esc(b.bron || "")}${b.link ? ` · <a href="${esc(b.link)}" target="_blank" rel="noopener">openen</a>` : ""}</p>${this.appLink("projectdoc", { tab: "loggen", project: b.project || a.titel, tekst: `${a.titel} (${v.datum}): ` }, "Loggen in projectdoc")}</div>` : ""}`;
     };
 
     m.innerHTML = `
@@ -206,6 +208,10 @@ const App = {
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.stuur(input.value, false); } });
     m.querySelector("#btn-stuur").addEventListener("click", () => { if (Spraak.luistert()) { this.dicteerModus = "vasthouden"; Spraak.stop(); return; } this.stuur(input.value, this.laatsteViaSpraak); });   // tijdens opnemen: stoppen en versturen zodra de laatste woorden binnen zijn
     this.bindMicrofoon(m.querySelector("#btn-dicteer"), input);
+    if (this.deelTekst) {   // via Android 'delen' binnengekomen: klaarzetten, jij bepaalt wat ermee moet
+      input.value = `"${this.deelTekst}" `; this.deelTekst = null;
+      input.focus(); this.toast("Gedeeld bericht staat klaar; zeg erbij wat ik ermee moet doen");
+    }
     if (this.gesprek.length) this.scrollGesprek();
   },
 
@@ -309,6 +315,25 @@ const App = {
     console.debug("antwoord in", Date.now() - t0, "ms");
   },
 
+  /* Koppelingen naar de andere IMeTech-apps (js/imetech-apps.js). */
+  appLink(app, params, label) {
+    if (!window.IMeTechApps) return "";
+    return `<a class="app-link" href="${esc(IMeTechApps.url(app, params))}">${esc(label)} ${IC("ic-chevron")}</a>`;
+  },
+  appLinks(it) {
+    const m = it.meta || {}, uit = [];
+    if (m.soort === "factuur_open" && m.factuurnummer) {
+      const tab = m.richting === "inkoop" ? "inkoop" : "verkoop";
+      uit.push(this.appLink("boekhouding", { tab, zet: `${tab}-hist-search:${m.factuurnummer}` }, "Open in boekhouding"));
+    } else if (m.soort === "uren_ontbrekend") {
+      const dag = (m.dagen || []).slice(-1)[0];
+      uit.push(this.appLink("uren", { tab: "invoer", zet: dag ? "field-datum:" + dag : undefined }, "Open in uren-app"));
+    } else if (it.project && it.categorie !== "geld" && it.categorie !== "prive") {
+      uit.push(this.appLink("projectdoc", { tab: "loggen", project: it.project }, "Loggen in projectdoc"));
+    }
+    return uit.length ? `<div class="app-links">${uit.join("")}</div>` : "";
+  },
+
   /* Offline: ingesproken of getypte berichten zonder bereik bewaren en later versturen. */
   wachtrij() { try { return JSON.parse(localStorage.getItem("chat_wachtrij") || "[]"); } catch (_) { return []; } },
   zetWachtrij(l) { try { localStorage.setItem("chat_wachtrij", JSON.stringify(l)); } catch (_) {} },
@@ -377,6 +402,7 @@ const App = {
       ${dagen.map(dagBlok).join("")}
       <datalist id="uren-projecten">${hist.map((h) => `<option value="${esc(h.project)}">`).join("")}</datalist>
       <p class="stil uitleg">Bestaande regels in je urenadministratie blijven zoals ze zijn; een aanvulling komt als extra regel.</p>
+      <div class="app-links">${this.appLink("uren", { tab: "invoer", zet: "field-datum:" + vandaag }, "Open in uren-app")}</div>
       <div class="invoer-balk"><button type="button" class="btn-primary btn-breed" id="uren-schrijf">Schrijf</button></div>`;
     const getal = (t) => { const x = parseFloat(String(t).replace(",", ".")); return isNaN(x) ? 0 : Math.max(0, Math.round(x * 4) / 4); };
     const lees = () => [...m.querySelectorAll(".ur-rij")].map((el) => {
@@ -505,6 +531,7 @@ const App = {
           <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>
           ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}
           ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}`}
+          ${this.appLinks(it)}
         </div>
       </div>
     </div>`;

@@ -1,8 +1,8 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v29";
-const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
+const CACHE = "assistent-v30";
+const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SCHIL)).then(() => self.skipWaiting()));
@@ -44,6 +44,11 @@ self.addEventListener("notificationclick", (e) => {
   }
   if (e.action && d.item_id) {
     e.waitUntil(actie(d.item_id, e.action, d.melding_id));
+    return;
+  }
+  if (!e.action && d.projectdoc) {   // logboekmelding: meteen loggen in de projectdoc-app
+    const q = new URLSearchParams({ tab: "loggen", project: d.projectdoc.project || "", tekst: d.projectdoc.tekst || "" });
+    e.waitUntil(self.clients.openWindow("https://imetech-engineering.github.io/projectdoc-pwa/?" + q));
     return;
   }
   if (d.url) {   // vertrekmelding: route openen
