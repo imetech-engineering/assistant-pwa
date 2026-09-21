@@ -524,3 +524,7 @@ html[data-theme="dark"] #app-wissel { background: var(--bg-tertiary); border-col
 .app-link { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 4px 12px; border-radius: 999px; background: var(--accent-light); color: var(--accent); font-size: 0.8125rem; font-weight: 600; text-decoration: none; }
 .app-link .ic { width: 14px; height: 14px; }
 .ag-briefje .app-link { margin-top: 8px; }
+
+/* Melding altijd bovenop, en boven een vaste knoppenbalk (bijv. Opslaan/Wis) in plaats van erachter */
+#toast, .toast { z-index: 95; }
+body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.hidden)) #toast { bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--sticky-h, 52px) + 12px); }
