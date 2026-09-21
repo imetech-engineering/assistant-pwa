@@ -570,69 +570,78 @@ const App = {
   async rInstellingen(m) {
     const c = await Opslag.instellingen();
     const s = this.cache.status;
-    const perm = "Notification" in window ? { granted: "toegestaan", denied: "geweigerd", default: "nog niet gevraagd" }[Notification.permission] : "niet beschikbaar";
+    const perm = "Notification" in window ? Notification.permission : "nvt";
     const stemmen = Spraak.stemmen();
+    const host = (c.adres || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
+    const stip = (ok) => `<i class="stip-status ${ok ? "ok" : "nee"}"></i>`;
+    const rij = (label, rechts = "", extra = "") => `<div class="inst-rij" ${extra}><span class="inst-label">${label}</span><span class="inst-waarde">${rechts}</span></div>`;
+    const knopRij = (id, label, rechts = IC("ic-chevron")) => `<button type="button" class="inst-rij inst-knop" id="${id}"><span class="inst-label">${label}</span><span class="inst-waarde">${rechts}</span></button>`;
+    const schakel = (id, label, aan) => `<label class="inst-rij"><span class="inst-label">${label}</span><span class="schakel"><input type="checkbox" id="${id}" ${aan ? "checked" : ""}><i></i></span></label>`;
+    const uit = (id, label, waarde, inhoud) => `<details class="inst-uit" id="${id}"><summary class="inst-rij"><span class="inst-label">${label}</span><span class="inst-waarde">${waarde}${IC("ic-chevron")}</span></summary><div class="inst-inhoud">${inhoud}</div></details>`;
     m.innerHTML = `
-      <form id="inst" class="card">
-        <h2>Verbinding</h2>
-        <label>Adres van de assistent<input name="adres" value="${esc(c.adres)}" placeholder="https://assistant.imetech.nl" inputmode="url" autocapitalize="off"></label>
-        <label>Token<input name="token" value="${esc(c.token)}" type="password" autocomplete="off"></label>
-        <div class="rij"><button type="submit" class="btn-primary">Opslaan en testen</button></div>
-      </form>
-      <section class="card">
-        <h2>Meldingen</h2>
-        <p class="stil">Toestemming: ${perm}.${s ? ` Server: ${s.push.vapid ? "klaar" : "niet ingesteld"}, ${s.push.abonnementen} toestel(len).` : ""}</p>
-        <div class="rij"><button type="button" id="abonneer" class="btn-primary">Meldingen aanzetten op dit toestel</button><button type="button" id="pushtest" class="btn-secondary">Testmelding</button></div>
-      </section>
-      <section class="card">
-        <h2>Spraak</h2>
-        <label class="check-row"><input type="checkbox" name="stem" id="stem-aan" ${c.stem !== false ? "checked" : ""}> Antwoorden altijd voorlezen (bij inspreken altijd)</label>
-        ${stemmen.length ? `<label>Stem<select id="stem-naam">${stemmen.map((v) => `<option value="${esc(v.name)}" ${v.name === c.stemNaam ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>` : ""}
-        <div class="rij"><button type="button" id="stem-test" class="btn-secondary">${IC("ic-luidspreker")} Test</button></div>
-      </section>
-      <section class="card">
-        <h2>Weergave</h2>
-        <label class="check-row"><input type="checkbox" id="toggle-dark-mode" ${document.documentElement.dataset.theme === "dark" ? "checked" : ""}> Donkere modus</label>
-        <div id="install-manual" class="hint hidden">Installeren: open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</div>
-        <div class="rij"><button type="button" id="btn-install-settings" class="btn-secondary">App installeren</button></div>
-      </section>
-      <details class="card klein" id="verbruik-sectie">
-        <summary><h2>Verbruik</h2><span class="hint">Hoeveel van je Claude-gebruik door de assistent komt.</span></summary>
-        <div id="verbruik-inhoud"><p class="stil">Laden…</p></div>
-      </details>
-      <details class="card klein" id="wbso-sectie">
-        <summary><h2>WBSO-projecten</h2><span class="hint">Eens per jaar: welke projecten tellen mee voor de 500 uur.</span></summary>
-        <div id="wbso-inhoud"><p class="stil">Laden…</p></div>
-      </details>
-      <section class="card">
-        <h2>Status</h2>
-        ${s ? `<ul class="status-lijst">
-          <li>Microsoft (mail, agenda, OneDrive): ${s.graph_gekoppeld ? "gekoppeld" : "niet gekoppeld"}</li>
-          <li>Claude: ${s.claude.oauth_token ? "abonnement" : s.claude.api_key ? "API-key" : "niet gekoppeld"}</li>
-          <li>Laatste verzamelronde: ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}</li>
-          <li>Laatste triage met Claude: ${s.scheduler.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet"}</li>
-          ${s.scheduler.fouten?.length ? `<li class="fout">Fouten: ${s.scheduler.fouten.map(esc).join("; ")}</li>` : ""}
-        </ul>` : `<p class="stil">Nog geen verbinding.</p>`}
-        <div class="rij"><button type="button" id="verzamel" class="btn-secondary">Nu verzamelen</button><button type="button" id="triage" class="btn-secondary">Verzamelen + opschonen</button><button type="button" id="briefing" class="btn-secondary">Briefing nu</button></div>
-      </section>`;
+      <h2>Verbinding</h2>
+      <div class="inst-kaart">
+        ${uit("verbinding", "Assistent", `${stip(!!s)}<span class="afkap">${s ? esc(host || "verbonden") : "niet verbonden"}</span>`, `
+          <form id="inst">
+            <label>Adres<input name="adres" value="${esc(c.adres)}" placeholder="https://assistant.imetech.nl" inputmode="url" autocapitalize="off"></label>
+            <label>Token<input name="token" value="${esc(c.token)}" type="password" autocomplete="off"></label>
+            <button type="submit" class="btn-primary">Opslaan en testen</button>
+          </form>`)}
+        ${rij("Microsoft", `${stip(s?.graph_gekoppeld)}${s ? (s.graph_gekoppeld ? "gekoppeld" : "niet gekoppeld") : "–"}`)}
+        ${rij("Claude", `${stip(s?.claude?.oauth_token || s?.claude?.api_key)}${s ? (s.claude.oauth_token ? "abonnement" : s.claude.api_key ? "API-key" : "niet gekoppeld") : "–"}`)}
+      </div>
+
+      <h2>Meldingen</h2>
+      <div class="inst-kaart">
+        ${schakel("meldingen-aan", "Meldingen op dit toestel", perm === "granted" && (s?.push?.abonnementen || 0) > 0)}
+        ${perm === "denied" ? `<p class="inst-noot">Geweigerd in de browser; zet ze aan via de site-instellingen van je browser.</p>` : ""}
+        ${knopRij("pushtest", "Testmelding", `${s ? `${s.push.abonnementen} toestel${s.push.abonnementen === 1 ? "" : "len"}` : ""}${IC("ic-chevron")}`)}
+      </div>
+
+      <h2>Spraak en weergave</h2>
+      <div class="inst-kaart">
+        ${schakel("stem-aan", "Antwoorden voorlezen", c.stem !== false)}
+        ${stemmen.length ? `<label class="inst-rij"><span class="inst-label">Stem</span><select id="stem-naam" class="inst-select">${stemmen.map((v) => `<option value="${esc(v.name)}" ${v.name === c.stemNaam ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>` : ""}
+        ${knopRij("stem-test", "Stem testen", IC("ic-luidspreker"))}
+        ${schakel("toggle-dark-mode", "Donkere modus", document.documentElement.dataset.theme === "dark")}
+        ${knopRij("btn-install-settings", "App installeren")}
+        <p id="install-manual" class="inst-noot hidden">Open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</p>
+      </div>
+
+      <h2>Assistent</h2>
+      <div class="inst-kaart">
+        ${uit("verbruik-sectie", "Verbruik", "", `<div id="verbruik-inhoud"><p class="stil">Laden…</p></div>`)}
+        ${uit("wbso-sectie", "WBSO-projecten", "", `<div id="wbso-inhoud"><p class="stil">Laden…</p></div>`)}
+        ${rij("Laatste verzamelronde", s?.scheduler?.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet")}
+        ${rij("Laatste opschoonronde", s?.scheduler?.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet")}
+        ${s?.scheduler?.fouten?.length ? `<p class="inst-noot fout">${s.scheduler.fouten.map(esc).join("; ")}</p>` : ""}
+      </div>
+
+      <h2>Nu uitvoeren</h2>
+      <div class="inst-kaart">
+        ${knopRij("verzamel", "Verzamelen")}
+        ${knopRij("triage", "Verzamelen en opschonen")}
+        ${knopRij("briefing", "Briefing sturen")}
+      </div>`;
     m.querySelector("#inst").addEventListener("submit", async (e) => {
       e.preventDefault();
       const f = e.target;
       await Opslag.set("instellingen", { ...c, adres: f.adres.value.trim(), token: f.token.value.trim() });
       try { await Api.status(); this.toast("Verbonden"); await this.checkStatus(); this.render(); } catch (err) { this.toast(err.message, { fout: true }); }
     });
+    if (!s) m.querySelector("#verbinding").open = true;
     const bewaar = async (patch) => Opslag.set("instellingen", { ...(await Opslag.instellingen()), ...patch });
     m.querySelector("#stem-aan").addEventListener("change", (e) => bewaar({ stem: e.target.checked }));
     m.querySelector("#stem-naam")?.addEventListener("change", (e) => bewaar({ stemNaam: e.target.value }));
     m.querySelector("#stem-test").addEventListener("click", async () => { const i = await Opslag.instellingen(); Spraak.spreek("Hoi Ivo, ik ben je assistent. Zo klink ik.", i.stemNaam); });
     m.querySelector("#toggle-dark-mode").addEventListener("change", (e) => this.zetThema(e.target.checked));
     m.querySelector("#btn-install-settings").addEventListener("click", () => Installatie.promptInstall());
-    m.querySelector("#abonneer").addEventListener("click", () => this.abonneer());
+    m.querySelector("#meldingen-aan").addEventListener("change", (e) => { if (e.target.checked) this.abonneer(); else { e.target.checked = true; this.toast("Uitzetten kan via de site-instellingen van je browser"); } });
     m.querySelector("#pushtest").addEventListener("click", async () => { try { const r = await Api.pushTest(); this.toast(`Verstuurd naar ${r.verstuurd} toestel(len)`); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#verzamel").addEventListener("click", async () => { this.toast("Bezig…"); try { const r = await Api.verzamel(false); this.toast(`Klaar: ${r.direct || 0} bijgewerkt, ${r.afgerond || 0} afgerond`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); const o = r.opschoon || {}; this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${(r.dubbel || 0) + (o.samengevoegd || 0)} samengevoegd, ${(r.afgerond || 0) + (o.afgerond || 0)} afgerond, ${o.hernoemd || 0} bijgewerkt`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
-    m.querySelector("#verbruik-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rVerbruik(m.querySelector("#verbruik-inhoud")); }, { once: false });
-    m.querySelector("#wbso-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rWbso(m.querySelector("#wbso-inhoud")); }, { once: false });
+    m.querySelector("#verbruik-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rVerbruik(m.querySelector("#verbruik-inhoud")); });
+    m.querySelector("#wbso-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rWbso(m.querySelector("#wbso-inhoud")); });
     m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },
 

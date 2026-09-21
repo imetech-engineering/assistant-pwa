@@ -331,3 +331,44 @@ details.card.klein #wbso-inhoud { margin-top: 10px; }
 .invoer-rij label { margin: 0; font-size: 0.875rem; color: var(--text-primary); }
 .invoer-rij .getal { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
 .invoer-rij .getal input { width: 4.5em; text-align: right; }
+
+/* ---------- Instellingen: gegroepeerde lijst (zelfde patroon voor alle IMeTech-PWA's) ---------- */
+.inst-kaart { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 4px; overflow: hidden; }
+.inst-kaart > :not(:first-child) { border-top: 1px solid var(--border); }
+.inst-kaart > .inst-noot { border-top: 0; margin-top: -6px; }
+.inst-rij { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 10px 14px; margin: 0;
+  width: 100%; background: none; border: 0; border-radius: 0; color: var(--text-primary); font: inherit; font-size: 0.9375rem; text-align: left; cursor: default; }
+.inst-label { flex: 1; min-width: 0; }
+.inst-waarde { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 60%; color: var(--text-secondary); font-size: 0.875rem; }
+.inst-waarde .afkap { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inst-waarde .ic { width: 16px; height: 16px; color: var(--text-tertiary); flex-shrink: 0; }
+button.inst-knop, .inst-uit > summary { cursor: pointer; }
+button.inst-knop:active, .inst-uit > summary:active { background: var(--bg-hover); }
+button.inst-knop { min-height: 48px; }
+.inst-uit > summary { list-style: none; }
+.inst-uit > summary::-webkit-details-marker { display: none; }
+.inst-uit[open] > summary .inst-waarde > .ic:last-child { transform: rotate(90deg); }
+.inst-inhoud { padding: 4px 14px 14px; }
+.inst-inhoud label { font-size: 0.875rem; }
+.inst-inhoud form { display: flex; flex-direction: column; gap: 8px; }
+.inst-select { width: auto; max-width: 55%; min-height: 36px; padding: 4px 8px; font-size: 0.875rem; background: var(--bg-secondary); }
+.inst-noot { margin: 0; padding: 8px 14px 10px; font-size: 0.8125rem; color: var(--text-secondary); }
+.inst-noot.fout { color: var(--danger); }
+.stip-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; background: var(--text-tertiary); }
+.stip-status.ok { background: var(--goed); }
+.stip-status.nee { background: var(--danger); }
+/* Schakelaar */
+.schakel { position: relative; display: inline-flex; flex-shrink: 0; width: 44px; height: 26px; }
+.schakel input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.schakel i { width: 100%; height: 100%; border-radius: 13px; background: var(--border-strong); transition: background .15s; pointer-events: none; }
+.schakel i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .15s; }
+.schakel input:checked + i { background: var(--accent); }
+.schakel input:checked + i::after { transform: translateX(18px); }
+.schakel input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+.inst-inhoud .check-row { min-height: 36px; padding: 2px 0; margin: 0; font-size: 0.9375rem; }
+.inst-inhoud .rij { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: nowrap; }
+.inst-inhoud .rij label { display: flex; align-items: center; gap: 8px; margin: 0; }
+.inst-inhoud .rij select { width: auto; min-height: 36px; padding: 4px 8px; }
+.inst-inhoud .rij input { flex: 1; min-width: 0; min-height: 40px; }
+.inst-inhoud .rij .btn-primary { flex-shrink: 0; }
+.inst-inhoud .rij .hint { margin: 0; }
