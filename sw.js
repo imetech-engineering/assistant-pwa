@@ -1,11 +1,11 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v30";
+const CACHE = "assistent-v31";
 const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SCHIL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SCHIL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));   // langs de HTTP-cache: altijd de verse versie
 });
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
