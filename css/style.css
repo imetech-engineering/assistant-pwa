@@ -189,6 +189,8 @@ label input:not([type=checkbox]) { margin-top: 4px; }
   font-size: 0.875rem; z-index: 40; box-shadow: 0 4px 20px rgba(0,0,0,.15);
 }
 .toast.fout { background: var(--danger); color: #fff; }
+/* Chat-tab: toast en installatiebanner boven de invoerbalk, nooit over de microfoon/verstuurknop */
+body:has(.invoer-balk) .toast, body:has(.invoer-balk) .install-banner { bottom: calc(var(--nav-h) + var(--safe-bottom) + 76px); }
 
 
 /* Iconen */

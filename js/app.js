@@ -353,8 +353,9 @@ const App = {
         <div class="acties">
           ${afgehandeld ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Terugzetten</button>` : `
           <button type="button" data-actie="done" class="goed">${IC("ic-vink")} Gedaan</button>
+          ${it.meta?.voorwaarde ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Voorwaarde vervuld</button>` : `
           <button type="button" data-actie="snooze" data-tot="morgen">${IC("ic-klok")} Morgen</button>
-          <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>
+          <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>`}
           <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>
           ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}
           ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}`}
@@ -379,8 +380,9 @@ const App = {
       const titel = kaart.querySelector(".titel").textContent;
       kaart.classList.add("weg");
       try {
-        await Api.actie(id, actie, { tot: b.dataset.tot });
-        const tekst = { done: "Afgevinkt", snooze: b.dataset.tot === "morgen" ? "Tot morgen uitgesteld" : "Tot volgende week uitgesteld", dismiss: "Als niet relevant gemarkeerd", reopen: "Teruggezet" }[actie];
+        const res = await Api.actie(id, actie, { tot: b.dataset.tot });
+        if (res && res.ok === false) throw new Error("Niet gelukt, er is niets aangepast");   // nooit "Afgevinkt" tonen als de server niets deed
+        const tekst = { done: "Afgevinkt", snooze: b.dataset.tot === "morgen" ? "Tot morgen uitgesteld" : "Tot volgende week uitgesteld", dismiss: "Als niet relevant gemarkeerd", reopen: "Weer actief" }[actie];
         this.toast(`${tekst}: ${titel.slice(0, 40)}${titel.length > 40 ? "…" : ""}`, actie === "reopen" ? {} : {
           ongedaan: async () => { try { await Api.actie(id, "reopen"); this.toast("Teruggezet"); this.render(); this.checkStatus(); } catch (e) { this.toast(e.message, { fout: true }); } },
         });
