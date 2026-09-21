@@ -579,7 +579,7 @@ const App = {
     const schakel = (id, label, aan) => `<label class="inst-rij"><span class="inst-label">${label}</span><span class="schakel"><input type="checkbox" id="${id}" ${aan ? "checked" : ""}><i></i></span></label>`;
     const uit = (id, label, waarde, inhoud) => `<details class="inst-uit" id="${id}"><summary class="inst-rij"><span class="inst-label">${label}</span><span class="inst-waarde">${waarde}${IC("ic-chevron")}</span></summary><div class="inst-inhoud">${inhoud}</div></details>`;
     m.innerHTML = `
-      <h2>Verbinding</h2>
+      <h2 class="inst-kop">Verbinding</h2>
       <div class="inst-kaart">
         ${uit("verbinding", "Assistent", `${stip(!!s)}<span class="afkap">${s ? esc(host || "verbonden") : "niet verbonden"}</span>`, `
           <form id="inst">
@@ -591,14 +591,14 @@ const App = {
         ${rij("Claude", `${stip(s?.claude?.oauth_token || s?.claude?.api_key)}${s ? (s.claude.oauth_token ? "abonnement" : s.claude.api_key ? "API-key" : "niet gekoppeld") : "–"}`)}
       </div>
 
-      <h2>Meldingen</h2>
+      <h2 class="inst-kop">Meldingen</h2>
       <div class="inst-kaart">
         ${schakel("meldingen-aan", "Meldingen op dit toestel", perm === "granted" && (s?.push?.abonnementen || 0) > 0)}
         ${perm === "denied" ? `<p class="inst-noot">Geweigerd in de browser; zet ze aan via de site-instellingen van je browser.</p>` : ""}
         ${knopRij("pushtest", "Testmelding", `${s ? `${s.push.abonnementen} toestel${s.push.abonnementen === 1 ? "" : "len"}` : ""}${IC("ic-chevron")}`)}
       </div>
 
-      <h2>Spraak en weergave</h2>
+      <h2 class="inst-kop">Spraak en weergave</h2>
       <div class="inst-kaart">
         ${schakel("stem-aan", "Antwoorden voorlezen", c.stem !== false)}
         ${stemmen.length ? `<label class="inst-rij"><span class="inst-label">Stem</span><select id="stem-naam" class="inst-select">${stemmen.map((v) => `<option value="${esc(v.name)}" ${v.name === c.stemNaam ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></label>` : ""}
@@ -608,7 +608,7 @@ const App = {
         <p id="install-manual" class="inst-noot hidden">Open het menu van je browser en kies <strong>Toevoegen aan startscherm</strong>.</p>
       </div>
 
-      <h2>Assistent</h2>
+      <h2 class="inst-kop">Assistent</h2>
       <div class="inst-kaart">
         ${uit("verbruik-sectie", "Verbruik", "", `<div id="verbruik-inhoud"><p class="stil">Laden…</p></div>`)}
         ${uit("wbso-sectie", "WBSO-projecten", "", `<div id="wbso-inhoud"><p class="stil">Laden…</p></div>`)}
@@ -617,7 +617,7 @@ const App = {
         ${s?.scheduler?.fouten?.length ? `<p class="inst-noot fout">${s.scheduler.fouten.map(esc).join("; ")}</p>` : ""}
       </div>
 
-      <h2>Nu uitvoeren</h2>
+      <h2 class="inst-kop">Nu uitvoeren</h2>
       <div class="inst-kaart">
         ${knopRij("verzamel", "Verzamelen")}
         ${knopRij("triage", "Verzamelen en opschonen")}
