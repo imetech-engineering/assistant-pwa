@@ -229,7 +229,7 @@ const App = {
       if (!Spraak.luistert()) return;
       if (lang && bijStart) { this.dicteerModus = "vasthouden"; Spraak.stop(); }   // loslaten: versturen zodra de laatste woorden binnen zijn
       else if (!bijStart) { this.dicteerModus = "tik"; Spraak.stop(); }            // tweede tik: stoppen, niet versturen
-      else { this.dicteerModus = "tik"; this.toast("Ik luister… tik nog eens om te stoppen. Vasthouden = meteen versturen."); }
+      else { this.dicteerModus = "tik"; }   // geen toast: die lag over de invoerbalk; de rode microfoon en de placeholder zeggen genoeg
     };
     knop.addEventListener("pointerup", los);
     knop.addEventListener("pointercancel", los);
@@ -240,6 +240,7 @@ const App = {
     Spraak.stil();
     const hint = document.getElementById("dicteer-hint");
     const basis = veld.value.trim();   // al getypte of eerder ingesproken tekst blijft staan
+    const placeholder = veld.placeholder;
     let laatste = "";
     this.dicteerModus = "tik";
     const gestart = Spraak.start({
@@ -247,13 +248,13 @@ const App = {
       onTussentijds(voorlopig) { hint.textContent = voorlopig ? "… " + voorlopig : ""; hint.classList.toggle("hidden", !voorlopig); },
       onFout: (msg) => this.toast(msg, { fout: true }),
       onEinde: ({ onderbroken } = {}) => {
-        knop.setAttribute("aria-pressed", "false"); knop.title = "Inspreken"; hint.classList.add("hidden");
+        knop.setAttribute("aria-pressed", "false"); knop.title = "Inspreken"; hint.classList.add("hidden"); veld.placeholder = placeholder;
         this.laatsteViaSpraak = !!laatste.trim();
         if (this.dicteerModus === "vasthouden" && !onderbroken && veld.value.trim()) { this.stuur(veld.value, true); return; }
         if (laatste.trim() && !onderbroken) { hint.textContent = "Kijk het na en druk op versturen."; hint.classList.remove("hidden"); setTimeout(() => hint.classList.add("hidden"), 4000); }
       },
     });
-    if (gestart) { knop.setAttribute("aria-pressed", "true"); knop.title = "Stoppen"; if (navigator.vibrate) navigator.vibrate(20); }
+    if (gestart) { knop.setAttribute("aria-pressed", "true"); knop.title = "Stoppen"; veld.placeholder = "Ik luister…"; if (navigator.vibrate) navigator.vibrate(20); }
   },
 
   async stuur(tekst, viaSpraak) {
