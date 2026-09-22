@@ -39,7 +39,8 @@ const App = {
     setTimeout(() => this.verstuurWachtrij(), 1500);
     this.ga(this.tab);
     this.checkStatus();
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) { this.checkStatus(); this.render(); } });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) { this.checkStatus(); this.render(); this.verstuurWachtrij(); } });
+    this.planWachtrij();
     this.initTrekVernieuwen();
   },
 
@@ -322,21 +323,31 @@ const App = {
     if (!tekst) return;
     const input = document.getElementById("vraag-tekst"); if (input) input.value = "";
     this.laatsteViaSpraak = false;
+    await this.verstuurWachtrij();   // eerst wat nog bewaard stond, dan blijft de volgorde kloppen
+    const id = this.nieuwId();
     this.gesprek.push({ rol: "user", tekst });
-    const wacht = { rol: "assistant", tekst: "Even kijken…", wacht: true };
+    const wacht = { rol: "assistant", tekst: "Even kijken…", wacht: true, qid: id };
     this.gesprek.push(wacht);
-    const g = document.getElementById("gesprek"); if (g) { g.innerHTML = this.gesprek.map((b) => this.belHtml(b)).join(""); this.scrollGesprek(); }
+    const teken = () => { if (this.tab !== "assistent") return; const g = document.getElementById("gesprek"); if (g) { g.innerHTML = this.gesprek.map((b) => this.belHtml(b)).join(""); this.scrollGesprek(); } };
+    teken();
     const t0 = Date.now();
     try {
-      const r = await Api.chat(tekst);
+      // Valt de verbinding onderweg weg (app op de achtergrond, wisselend bereik), dan nog een paar keer
+      // proberen met hetzelfde id: de Pi geeft dan het antwoord dat hij al had in plaats van het dubbel te doen.
+      let r;
+      for (const pauze of [0, 3000, 8000, 15000]) {
+        if (pauze) { Object.assign(wacht, { tekst: "Verbinding viel even weg, ik probeer het opnieuw…" }); teken(); await new Promise((ok) => setTimeout(ok, pauze)); }
+        try { r = await Api.chat(tekst, id); break; } catch (e) { if (!(e instanceof TypeError) && !/^50[234]/.test(e.message)) throw e; if (pauze === 15000) throw new TypeError("geen verbinding"); }
+      }
       Object.assign(wacht, { tekst: r.antwoord, wacht: false, acties: r.acties });
       const inst = await Opslag.instellingen();
       if (viaSpraak || inst.stem !== false) Spraak.spreek(r.antwoord, inst.stemNaam);
       if (r.acties?.length) { this.checkStatus(); if (this.tab === "assistent") setTimeout(() => this.render(), r.acties.some((a) => a.actie === "opdracht") ? 1500 : 400); }
     } catch (e) {
       if (!navigator.onLine || e instanceof TypeError) {   // geen verbinding: bewaren en later versturen
-        this.zetInWachtrij(tekst);
+        this.zetInWachtrij(tekst, id);
         Object.assign(wacht, { tekst: "Geen verbinding. Ik heb het bewaard en stuur het zodra je weer bereik hebt.", wacht: false });
+        this.planWachtrij();
       } else Object.assign(wacht, { tekst: "Dat lukte even niet: " + e.message, wacht: false, fout: true });
     }
     if (this.gesprek.length > 30) this.gesprek = this.gesprek.slice(-30);
@@ -366,22 +377,38 @@ const App = {
   /* Offline: ingesproken of getypte berichten zonder bereik bewaren en later versturen. */
   wachtrij() { try { return JSON.parse(localStorage.getItem("chat_wachtrij") || "[]"); } catch (_) { return []; } },
   zetWachtrij(l) { try { localStorage.setItem("chat_wachtrij", JSON.stringify(l)); } catch (_) {} },
-  zetInWachtrij(tekst) { const l = this.wachtrij(); l.push({ tekst, at: new Date().toISOString() }); this.zetWachtrij(l); },
+  zetInWachtrij(tekst, id) { const l = this.wachtrij(); l.push({ tekst, id: id || this.nieuwId(), at: new Date().toISOString() }); this.zetWachtrij(l); },
+  nieuwId() { try { return crypto.randomUUID(); } catch (_) { return Date.now().toString(36) + Math.random().toString(36).slice(2); } },
+  /* Zolang er iets bewaard staat: elke 20 seconden opnieuw proberen (ook als de telefoon al 'online' was). */
+  planWachtrij() {
+    clearTimeout(this._wachtrijKlok);
+    if (!this.wachtrij().length) return;
+    this._wachtrijKlok = setTimeout(async () => { await this.verstuurWachtrij(); this.planWachtrij(); }, 20000);
+  },
   async verstuurWachtrij() {
     if (this._wachtrijBezig || !navigator.onLine) return;
     const l = this.wachtrij(); if (!l.length) return;
     this._wachtrijBezig = true;
+    let verstuurd = 0;
     try {
       while (l.length) {
         const m = l[0];
         let r;
-        try { r = await Api.chat(m.tekst); } catch (e) { if (e instanceof TypeError) break; r = { antwoord: "Niet gelukt: " + e.message }; }
+        try { r = await Api.chat(m.tekst, m.id); } catch (e) { if (e instanceof TypeError || /^50[234]/.test(e.message)) break; r = { antwoord: "Niet gelukt: " + e.message }; }
         l.shift(); this.zetWachtrij(l);
-        const tijd = new Date(m.at).toTimeString().slice(0, 5);
-        this.gesprek.push({ rol: "user", tekst: `${m.tekst} (bewaard om ${tijd})` }, { rol: "assistant", tekst: r.antwoord, acties: r.acties });
+        verstuurd++;
+        // Staat de "bewaard"-bel van dit bericht nog in beeld, dan komt het antwoord daar; anders erbij.
+        const bel = m.id && this.gesprek.find((b) => b.qid === m.id);
+        if (bel) Object.assign(bel, { tekst: r.antwoord, wacht: false, acties: r.acties, fout: false });
+        else {
+          const tijd = new Date(m.at).toTimeString().slice(0, 5);
+          this.gesprek.push({ rol: "user", tekst: `${m.tekst} (bewaard om ${tijd})` }, { rol: "assistant", tekst: r.antwoord, acties: r.acties });
+        }
       }
-      this.toast("Bewaarde berichten verstuurd");
-      if (this.tab === "assistent") this.render();
+      if (verstuurd) {
+        this.toast(verstuurd === 1 ? "Bewaard bericht alsnog verstuurd" : "Bewaarde berichten verstuurd");
+        if (this.tab === "assistent") this.render();
+      }
     } finally { this._wachtrijBezig = false; }
   },
 

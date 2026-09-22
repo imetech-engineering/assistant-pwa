@@ -22,7 +22,7 @@ const Api = {
   nieuwItem(body) { return this.call("/items", { method: "POST", body }); },
   actie(id, actie, extra = {}) { return this.call(`/items/${id}/actie`, { method: "POST", body: { actie, ...extra } }); },
   herinnering(id) { return this.call(`/items/${id}/concept`, { method: "POST" }); },
-  chat(tekst) { return this.call("/chat", { method: "POST", body: { tekst } }); },
+  chat(tekst, id) { return this.call("/chat", { method: "POST", body: { tekst, id } }); },
   chatGeschiedenis() { return this.call("/chat"); },
   vapid() { return this.call("/push/vapid"); },
   abonneer(abonnement, apparaat) { return this.call("/push/abonneer", { method: "POST", body: { abonnement, apparaat } }); },
