@@ -209,7 +209,10 @@ body:has(.invoer-balk) .toast, body:has(.invoer-balk) .install-banner { bottom: 
 .btn-rond-primair { color: #fff; background: var(--accent); border-color: var(--accent); }
 @keyframes pulseer { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 .invoer-balk { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: center; padding: 10px 0 8px; background: var(--bg-secondary); }
-.invoer-balk input { flex: 1; min-width: 0; }
+.invoer-balk input, .invoer-balk textarea { flex: 1; min-width: 0; }
+.invoer-balk { align-items: flex-end; }
+#vraag-tekst { resize: none; min-height: var(--touch); max-height: 168px; line-height: 1.4; padding: 10px 12px; overflow-y: hidden; display: block; }
+#vraag-tekst.vol { overflow-y: auto; }
 
 /* Assistent-scherm */
 .groet { border-left: 3px solid var(--accent); }

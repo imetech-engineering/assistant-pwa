@@ -212,7 +212,7 @@ const App = {
       <p id="dicteer-hint" class="hint hidden"></p>
       <div class="invoer-balk">
         <button type="button" id="btn-dicteer" class="btn-rond" aria-pressed="false" aria-label="Inspreken" title="Inspreken">${IC("ic-mic")}</button>
-        <input id="vraag-tekst" placeholder="Typ of spreek in…" autocomplete="off" enterkeyhint="send" />
+        <textarea id="vraag-tekst" rows="1" placeholder="Typ of spreek in…" autocomplete="off" enterkeyhint="send"></textarea>
         <button type="button" id="btn-stuur" class="btn-rond btn-rond-primair" aria-label="Versturen">${IC("ic-versturen")}</button>
       </div>`;
     this.bindItems(m);
@@ -228,7 +228,12 @@ const App = {
     m.querySelectorAll("[data-opdracht-opnieuw]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtOpnieuw(b.dataset.opdrachtOpnieuw); this.toast("Opnieuw klaargezet, wordt binnen een uur opgepakt"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     m.querySelectorAll("[data-opdracht-gezien]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtGezien(b.dataset.opdrachtGezien); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     const input = m.querySelector("#vraag-tekst");
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.stuur(input.value, false); } });
+    // Het veld groeit mee met de tekst (ook bij inspreken), zodat je een lang bericht kunt nalezen.
+    const groei = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 168) + "px"; input.classList.toggle("vol", input.scrollHeight > 168); };
+    const echt = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value");
+    Object.defineProperty(input, "value", { get() { return echt.get.call(this); }, set(v) { echt.set.call(this, v); groei(); } });
+    input.addEventListener("input", groei);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.stuur(input.value, false); } });
     m.querySelector("#btn-stuur").addEventListener("click", () => { if (Spraak.luistert()) { this.dicteerModus = "vasthouden"; Spraak.stop(); return; } this.stuur(input.value, this.laatsteViaSpraak); });   // tijdens opnemen: stoppen en versturen zodra de laatste woorden binnen zijn
     this.bindMicrofoon(m.querySelector("#btn-dicteer"), input);
     if (this.deelTekst) {   // via Android 'delen' binnengekomen: klaarzetten, jij bepaalt wat ermee moet
