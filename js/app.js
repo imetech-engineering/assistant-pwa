@@ -250,7 +250,7 @@ const App = {
       <div class="rij">
         ${link ? `<a class="btn-link" href="${esc(link[0])}" target="_blank" rel="noopener">Openen ${IC("ic-chevron")}</a>` : ""}
         ${o.status === "wacht" ? `<button type="button" class="btn-secondary" data-opdracht-annuleer="${o.id}">Annuleren</button>` : ""}
-        ${o.status === "mislukt" ? `<button type="button" class="btn-primary" data-opdracht-opnieuw="${o.id}">${IC("ic-herstel")} Opnieuw</button>` : ""}
+        ${o.status === "mislukt" ? `<button type="button" class="btn-secondary" data-opdracht-opnieuw="${o.id}">${IC("ic-herstel")} Opnieuw</button>` : ""}
         ${o.status === "klaar" || o.status === "mislukt" ? `<button type="button" class="btn-secondary" data-opdracht-gezien="${o.id}">${IC("ic-vink")} Gezien</button>` : ""}
       </div>
     </div>`;
