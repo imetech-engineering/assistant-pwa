@@ -225,6 +225,7 @@ const App = {
     m.querySelectorAll(".chip[data-vraag]").forEach((c) => c.addEventListener("click", () => this.stuur(c.dataset.vraag, false)));
     m.querySelectorAll(".chip[data-vul]").forEach((c) => c.addEventListener("click", () => { const i = m.querySelector("#vraag-tekst"); i.value = c.dataset.vul; i.focus(); }));
     m.querySelectorAll("[data-opdracht-annuleer]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtAnnuleer(b.dataset.opdrachtAnnuleer); this.toast("Opdracht geannuleerd"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
+    m.querySelectorAll("[data-opdracht-opnieuw]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtOpnieuw(b.dataset.opdrachtOpnieuw); this.toast("Opnieuw klaargezet, wordt binnen een uur opgepakt"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     m.querySelectorAll("[data-opdracht-gezien]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtGezien(b.dataset.opdrachtGezien); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     const input = m.querySelector("#vraag-tekst");
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); this.stuur(input.value, false); } });
@@ -238,7 +239,7 @@ const App = {
   },
 
   opdrachtRij(o) {
-    const naam = { mailconcept: "Mailconcept", meeting_voorbereiden: "Meeting voorbereiden", projectdoc: "Projectdoc bijwerken", offerte: "Offerte", overig: "Opdracht" }[o.soort] || "Opdracht";
+    const naam = { mailconcept: "Mailconcept", meeting_voorbereiden: "Meeting voorbereiden", projectdoc: "Projectdoc bijwerken", offerte: "Offerte", timetick: "Timetick", timetick_check: "Timetick uitlezen", nieuw_project: "Nieuw project", overig: "Opdracht" }[o.soort] || "Opdracht";
     const status = { wacht: ["grijs", "in de wachtrij"], bezig: ["oranje", "bezig"], klaar: ["groen", "klaar"], mislukt: ["rood", "niet gelukt"] }[o.status] || ["grijs", o.status];
     const link = (o.resultaat || "").match(/https?:\/\/\S+/);
     return `<div class="opdracht">
@@ -249,6 +250,7 @@ const App = {
       <div class="rij">
         ${link ? `<a class="btn-link" href="${esc(link[0])}" target="_blank" rel="noopener">Openen ${IC("ic-chevron")}</a>` : ""}
         ${o.status === "wacht" ? `<button type="button" class="btn-secondary" data-opdracht-annuleer="${o.id}">Annuleren</button>` : ""}
+        ${o.status === "mislukt" ? `<button type="button" class="btn-primary" data-opdracht-opnieuw="${o.id}">${IC("ic-herstel")} Opnieuw</button>` : ""}
         ${o.status === "klaar" || o.status === "mislukt" ? `<button type="button" class="btn-secondary" data-opdracht-gezien="${o.id}">${IC("ic-vink")} Gezien</button>` : ""}
       </div>
     </div>`;
