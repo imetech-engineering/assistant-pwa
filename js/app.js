@@ -436,7 +436,7 @@ const App = {
     const v = d.voorstel || {}, hist = d.historie || [];
     const perProject = Object.fromEntries(hist.map((h) => [h.project, h]));
     const mt = d.meten || {};
-    const meetBezig = !!mt.bezig && (!mt.start || Date.now() - new Date(mt.start).getTime() < 5 * 60e3);
+    const meetBezig = !!mt.bezig && (!mt.start || Date.now() - new Date(mt.start).getTime() < 10 * 60e3);
     const regels = v.regels || [];
     const isOpen = (r) => ["schrijven", "aanvullen"].includes(r.status) && r.voorstel_uren > 0 && !r.geschreven_via_app;
     const open = regels.filter(isOpen), rest = regels.filter((r) => !isOpen(r));
@@ -603,7 +603,7 @@ const App = {
     // Meten draait op de Pi op de achtergrond; dit scherm kijkt elke paar seconden of het klaar is, ook na terugkomen in de app
     const wachtOpMeting = async (voor) => {
       const b2 = m.querySelector("#uren-meet"); b2.disabled = true; b2.classList.add("draait");
-      for (let t = 0; t < 75; t++) {
+      for (let t = 0; t < 150; t++) {
         await new Promise((r) => setTimeout(r, 4000));
         if (!this.urenOpen || !document.body.contains(b2)) return;
         let x; try { x = await Api.urenVoorstel(); } catch (_) { continue; }   // even geen verbinding: doorproberen
