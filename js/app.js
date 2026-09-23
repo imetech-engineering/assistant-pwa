@@ -497,7 +497,7 @@ const App = {
         <div><p class="scherm-titel">Uren</p><p class="scherm-sub">Gemeten sinds ${v.gisteren ? dagNaam(v.gisteren) + " 17:00" : "gisteren"}</p></div>
         <button type="button" class="btn-rond" id="uren-meet" aria-label="Opnieuw meten" title="Opnieuw meten">${IC("ic-herstel")}</button>
       </div>
-      ${meetBezig ? `<p class="melding-let-op" id="uren-meet-status">Bezig met meten op de Pi… dit scherm ververst vanzelf.</p>` : mt.fout ? `<p class="melding-let-op">Laatste meting mislukt${mt.klaar ? " (" + new Date(mt.klaar).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }) + ")" : ""}: ${esc(mt.fout)}</p>` : !v.gemaakt ? `<p class="melding-let-op">Nog geen meting beschikbaar. Tik op ${IC("ic-herstel")} om te meten.</p>` : ""}
+      ${meetBezig ? `<p class="melding-let-op" id="uren-meet-status">Bezig met meten op de Pi… dit scherm ververst vanzelf.</p>` : mt.fout ? `<p class="melding-let-op">Laatste meting mislukt${mt.klaar ? " (" + new Date(mt.klaar).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }) + ")" : ""}: ${esc(mt.fout)}</p>` : mt.bezig ? `<p class="melding-let-op">De vorige meting is blijven hangen. Tik op de herlaadknop rechtsboven om opnieuw te meten.</p>` : !v.gemaakt ? `<p class="melding-let-op">Nog geen meting beschikbaar. Tik op de herlaadknop rechtsboven om te meten.</p>` : ""}
       ${v.voetnoot ? `<p class="melding-let-op">${esc(v.voetnoot)}</p>` : ""}
       ${!open.length ? `<p class="melding-goed">Alles geschreven ✓</p>` : ""}
       ${dagen.map(dagBlok).join("")}
