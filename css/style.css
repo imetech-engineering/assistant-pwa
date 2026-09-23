@@ -541,3 +541,19 @@ body:has(.invoer-sticky-bar:not(.hidden)) #toast, body:has(.install-banner:not(.
 
 /* Echte schermhoogte (gemeten in melding.js), zodat de balk onderin na vernieuwen in beeld blijft. */
 html body { height: var(--app-h, 100dvh); }
+
+/* ---------- Uren: geschreven naast gemeten (compact, zoals de historie in de uren-app) ---------- */
+.inst-kaart > .ur-vgl-lijst { padding: 6px 14px 8px; }
+.ur-vgl { padding: 6px 0; border-top: 1px solid var(--border); font-size: 0.8125rem; }
+.ur-vgl.klikbaar { cursor: pointer; }
+.ur-vgl-kop { display: flex; align-items: baseline; gap: 8px; }
+.ur-vgl-naam { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ur-getal { flex: 0 0 4.6em; text-align: right; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ur-getal.ur-gem { color: var(--text-secondary); font-weight: 500; }
+.ur-getal.ur-gem.let-op { color: var(--let-op); font-weight: 600; }
+.ur-vgl-werk { display: block; margin-top: 1px; color: var(--text-secondary); font-size: 0.75rem; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ur-vgl.open .ur-vgl-werk { white-space: normal; overflow-wrap: anywhere; color: var(--text-primary); }
+.ur-vgl-kolommen { padding-bottom: 2px; }
+.ur-vgl-kolommen .ur-getal { font-size: 0.6875rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .03em; }
+.ur-vgl-totaal { padding-top: 6px; border-top: 1px solid var(--border-strong); font-size: 0.8125rem; }
+.ur-vgl-totaal .ur-vgl-naam { color: var(--text-secondary); font-weight: 500; }

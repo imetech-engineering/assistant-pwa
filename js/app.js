@@ -452,14 +452,37 @@ const App = {
           <div class="ur-voet"><small>${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u</small>${stepper(r.voorstel_uren)}</div>
         </div>
       </div>`;
+    // Geschreven (urenadministratie) naast gemeten, per project. Open regels staan hierboven al als invoer.
+    const sleutel = (p) => { const nr = String(p || "").match(/^\s*(\d{4})/); return nr ? nr[1] : String(p || "").toLowerCase().replace(/\s+/g, ""); };
+    const vergelijk = (dag) => {
+      const openKeys = new Set(open.filter((r) => r.datum === dag).map((r) => sleutel(r.project)));
+      const per = new Map();
+      const pak = (p) => { const k = sleutel(p); if (!per.has(k)) per.set(k, { project: p, geschreven: 0, gemeten: 0, werk: [] }); return per.get(k); };
+      if (Array.isArray(d.geschreven)) d.geschreven.filter((g) => g.datum === dag && g.project).forEach((g) => { const x = pak(g.project); x.project = g.project; x.geschreven += g.uren || 0; if (g.werk) x.werk.push(g.werk); });
+      else rest.filter((r) => r.datum === dag).forEach((r) => { pak(r.project).geschreven += r.geschreven_via_app ? r.voorstel_uren : (r.geschreven || 0); });   // oudere backend
+      regels.filter((r) => r.datum === dag && r.project).forEach((r) => { pak(r.project).gemeten += r.gemeten || 0; });
+      return [...per.entries()].filter(([k, x]) => !openKeys.has(k) && (x.geschreven > 0 || x.gemeten > 0)).map(([, x]) => x);
+    };
+    const vglBlok = (lijst) => {
+      if (!lijst.length) return "";
+      const som = (k) => lijst.reduce((t, x) => t + x[k], 0);
+      const gem = (x) => x.gemeten ? n(x.gemeten) : "–";
+      const rijV = (x) => `<div class="ur-vgl${x.werk.length ? " klikbaar" : ""}">
+          <div class="ur-vgl-kop"><span class="ur-vgl-naam">${esc(x.project)}</span><span class="ur-getal">${x.geschreven ? n(x.geschreven) : "–"}</span><span class="ur-getal ur-gem${x.gemeten > x.geschreven + 0.5 ? " let-op" : ""}">${gem(x)}</span></div>
+          ${x.werk.length ? `<small class="ur-vgl-werk">${esc(x.werk.join(" · "))}</small>` : !x.gemeten ? `<small class="ur-vgl-werk">niet gemeten, bijv. op locatie</small>` : ""}
+        </div>`;
+      return `<div class="ur-vgl-kop ur-vgl-kolommen"><span class="ur-vgl-naam"></span><span class="ur-getal">geschreven</span><span class="ur-getal ur-gem">gemeten</span></div>
+        ${lijst.map(rijV).join("")}
+        ${lijst.length > 1 ? `<div class="ur-vgl-kop ur-vgl-totaal"><span class="ur-vgl-naam">Totaal</span><span class="ur-getal">${n(som("geschreven"))}</span><span class="ur-getal ur-gem">${n(som("gemeten"))}</span></div>` : ""}`;
+    };
     const dagBlok = (dag) => {
       const hier = open.map((r, i) => [r, i]).filter(([r]) => r.datum === dag);
-      const klaar = rest.filter((r) => r.datum === dag);
+      const klaar = vergelijk(dag);
       if (!hier.length && dag !== vandaag && !klaar.length) return "";
       return `<h2 class="inst-kop kop-met-link">${dagNaam(dag)}<span class="dag-totaal" data-dag="${dag}"></span></h2>
         <div class="inst-kaart uren-kaart-lijst" data-dag="${dag}">
           ${hier.map(([r, i]) => rij(r, i)).join("")}
-          ${klaar.map((r) => `<div class="inst-rij ur-klaar"><span class="inst-label">${r.geschreven_via_app ? "Zojuist geschreven" : r.status === "alleen_geschreven" ? "Geschreven (niet gemeten)" : "Geschreven"} · ${esc(r.project)}</span><span class="inst-waarde">${n(r.geschreven_via_app ? r.voorstel_uren : r.geschreven)} u</span></div>`).join("")}
+          ${klaar.length ? `<div class="ur-vgl-lijst">${vglBlok(klaar)}</div>` : ""}
           <button type="button" class="inst-rij inst-knop ur-nieuw" data-dag="${dag}"><span class="inst-label">＋ Regel toevoegen</span></button>
         </div>`;
     };
@@ -501,6 +524,8 @@ const App = {
     m.addEventListener("click", (e) => {
       const st = e.target.closest("[data-stap]");
       if (st) { const inp = st.parentElement.querySelector("input"); inp.value = n(Math.max(0, getal(inp.value) + parseFloat(st.dataset.stap))); navigator.vibrate?.(8); tel(); return; }
+      const vg = e.target.closest(".ur-vgl.klikbaar");
+      if (vg) { vg.classList.toggle("open"); return; }
       const nw = e.target.closest(".ur-nieuw");
       if (nw) {
         nw.insertAdjacentHTML("beforebegin", `<div class="ur-rij" data-i="nieuw" data-datum="${nw.dataset.dag}"><label class="schakel"><input type="checkbox" checked data-veld="aan" aria-label="Meeschrijven"><i></i></label><div class="ur-tekst"><input class="ur-project" list="uren-projecten" data-veld="project" placeholder="Project"><input class="ur-werk" data-veld="werkzaamheden" placeholder="Wat heb je gedaan?"><div class="ur-voet"><small>nieuwe regel</small>${stepper(1)}</div></div></div>`);
