@@ -438,8 +438,8 @@ const App = {
     const regels = v.regels || [];
     const isOpen = (r) => ["schrijven", "aanvullen"].includes(r.status) && r.voorstel_uren > 0 && !r.geschreven_via_app;
     const open = regels.filter(isOpen), rest = regels.filter((r) => !isOpen(r));
-    const vandaag = v.vandaag || new Date().toISOString().slice(0, 10);
-    const dagen = [...new Set([...(v.gisteren ? [v.gisteren] : []), vandaag, ...open.map((r) => r.datum)])].sort();
+    const vandaag = new Date().toLocaleDateString("sv-SE");   // echte datum van vandaag, ook als het voorstel van gisteren is
+    const dagen = [...new Set([...(v.gisteren ? [v.gisteren] : []), ...(v.vandaag ? [v.vandaag] : []), vandaag, ...open.map((r) => r.datum)])].sort();
     const dagNaam = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "short" });
     const n = (x) => (Math.round((x || 0) * 100) / 100).toString().replace(".", ",");
     const stepper = (uren) => `<div class="stepper"><button type="button" data-stap="-0.25" aria-label="Kwartier minder">−</button><input data-veld="uren" inputmode="decimal" value="${n(uren)}" aria-label="Uren"><button type="button" data-stap="0.25" aria-label="Kwartier meer">+</button></div>`;
