@@ -443,15 +443,22 @@ const App = {
     const dagNaam = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "short" });
     const n = (x) => (Math.round((x || 0) * 100) / 100).toString().replace(".", ",");
     const stepper = (uren) => `<div class="stepper"><button type="button" data-stap="-0.25" aria-label="Kwartier minder">−</button><input data-veld="uren" inputmode="decimal" value="${n(uren)}" aria-label="Uren"><button type="button" data-stap="0.25" aria-label="Kwartier meer">+</button></div>`;
-    const rij = (r, i) => `
-      <div class="ur-rij" data-i="${i}" data-datum="${r.datum}">
-        <label class="schakel"><input type="checkbox" checked data-veld="aan" aria-label="Meeschrijven"><i></i></label>
-        <div class="ur-tekst">
-          <input class="ur-project" list="uren-projecten" data-veld="project" value="${esc(r.project || "")}" placeholder="Project">
-          <input class="ur-werk" data-veld="werkzaamheden" value="${esc(r.werkzaamheden || "")}" placeholder="Wat heb je gedaan?">
-          <div class="ur-voet"><small>${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u</small>${stepper(r.voorstel_uren)}</div>
+    const projecten = hist.map((h) => h.project);
+    const voorbeelden = (p) => (perProject[p]?.voorbeelden || []).slice().reverse();
+    const rijHtml = (i, datum, r = {}, meta = "nieuwe regel") => `
+      <div class="ur-rij" data-i="${i}" data-datum="${datum}">
+        <div class="ur-boven">
+          <button type="button" class="ur-kies${r.project ? "" : " leeg"}" data-kies="project"><span>${esc(r.project || "Kies project")}</span>${IC("ic-omlaag")}</button>
+          <input type="hidden" data-veld="project" value="${esc(r.project || "")}">
+          <button type="button" class="ur-weg" aria-label="Regel weghalen">${IC("ic-prullenbak")}</button>
         </div>
+        <div class="ur-werk-wrap">
+          <input class="ur-werk" data-veld="werkzaamheden" value="${esc(r.werkzaamheden || "")}" placeholder="Wat heb je gedaan?" autocomplete="off">
+          <button type="button" class="ur-werk-kies" data-kies="werk" aria-label="Eerdere omschrijvingen">${IC("ic-omlaag")}</button>
+        </div>
+        <div class="ur-voet"><small>${meta}</small>${stepper(r.voorstel_uren ?? 1)}</div>
       </div>`;
+    const rij = (r, i) => rijHtml(i, r.datum, r, `${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u`);
     // Geschreven (urenadministratie) naast gemeten, per project. Open regels staan hierboven al als invoer.
     const sleutel = (p) => { const nr = String(p || "").match(/^\s*(\d{4})/); return nr ? nr[1] : String(p || "").toLowerCase().replace(/\s+/g, ""); };
     const vergelijk = (dag) => {
@@ -479,12 +486,8 @@ const App = {
       const hier = open.map((r, i) => [r, i]).filter(([r]) => r.datum === dag);
       const klaar = vergelijk(dag);
       if (!hier.length && dag !== vandaag && !klaar.length) return "";
-      return `<h2 class="inst-kop kop-met-link">${dagNaam(dag)}<span class="dag-totaal" data-dag="${dag}"></span></h2>
-        <div class="inst-kaart uren-kaart-lijst" data-dag="${dag}">
-          ${hier.map(([r, i]) => rij(r, i)).join("")}
-          ${klaar.length ? `<div class="ur-vgl-lijst">${vglBlok(klaar)}</div>` : ""}
-          <button type="button" class="inst-rij inst-knop ur-nieuw" data-dag="${dag}"><span class="inst-label">＋ Regel toevoegen</span></button>
-        </div>`;
+      return `<h2 class="inst-kop ur-dag-kop">${dagNaam(dag)}<span class="dag-totaal" data-dag="${dag}"></span><button type="button" class="ur-plus" data-dag="${dag}" aria-label="Regel toevoegen">${IC("ic-plus")}</button></h2>
+        <div class="inst-kaart uren-kaart-lijst" data-dag="${dag}">${hier.map(([r, i]) => rij(r, i)).join("")}${klaar.length ? `<div class="ur-vgl-lijst">${vglBlok(klaar)}</div>` : ""}</div>`;
     };
     m.innerHTML = `
       <div class="scherm-kop">
@@ -495,7 +498,6 @@ const App = {
       ${v.voetnoot ? `<p class="melding-let-op">${esc(v.voetnoot)}</p>` : ""}
       ${!open.length ? `<p class="melding-goed">Alles geschreven ✓</p>` : ""}
       ${dagen.map(dagBlok).join("")}
-      <datalist id="uren-projecten">${hist.map((h) => `<option value="${esc(h.project)}">`).join("")}</datalist>
       <p class="stil uitleg">Bestaande regels in je urenadministratie blijven zoals ze zijn; een aanvulling komt als extra regel.</p>
       <div class="app-links">${this.appLink("uren", { tab: "invoer", zet: "field-datum:" + vandaag }, "Open in uren-app")}</div>
       <div class="invoer-balk"><button type="button" class="btn-primary btn-breed" id="uren-schrijf">Schrijf</button></div>`;
@@ -504,7 +506,7 @@ const App = {
       const r = el.dataset.i !== "nieuw" ? open[+el.dataset.i] : { datum: el.dataset.datum };
       const w = (k) => el.querySelector(`[data-veld="${k}"]`);
       const project = w("project").value.trim(), h = perProject[project] || {}, zelfde = r.project === project;
-      return { aan: w("aan").checked, el, id: r.id ?? null, datum: r.datum, project,
+      return { aan: true, el, id: r.id ?? null, datum: r.datum, project,
         opdrachtgever: zelfde && r.opdrachtgever ? r.opdrachtgever : (h.opdrachtgever || ""),
         locatie: zelfde && r.locatie ? r.locatie : (h.locatie || ""),
         tarief: zelfde && r.tarief != null ? r.tarief : (h.tarief || 0),
@@ -513,7 +515,6 @@ const App = {
     const knop = m.querySelector("#uren-schrijf");
     const tel = () => {
       const alle = lees();
-      alle.forEach((r) => r.el.classList.toggle("uit", !r.aan));
       m.querySelectorAll(".dag-totaal").forEach((t) => { const som = alle.filter((r) => r.aan && r.datum === t.dataset.dag).reduce((s2, r) => s2 + r.uren, 0); t.textContent = som ? n(som) + " u" : ""; });
       const l = alle.filter((r) => r.aan && r.project && r.uren > 0);
       knop.textContent = l.length ? `Schrijf ${l.length} ${l.length === 1 ? "regel" : "regels"} · ${n(l.reduce((s2, r) => s2 + r.uren, 0))} u` : "Niets om te schrijven";
@@ -526,18 +527,92 @@ const App = {
       if (st) { const inp = st.parentElement.querySelector("input"); inp.value = n(Math.max(0, getal(inp.value) + parseFloat(st.dataset.stap))); navigator.vibrate?.(8); tel(); return; }
       const vg = e.target.closest(".ur-vgl.klikbaar");
       if (vg) { vg.classList.toggle("open"); return; }
-      const nw = e.target.closest(".ur-nieuw");
-      if (nw) {
-        nw.insertAdjacentHTML("beforebegin", `<div class="ur-rij" data-i="nieuw" data-datum="${nw.dataset.dag}"><label class="schakel"><input type="checkbox" checked data-veld="aan" aria-label="Meeschrijven"><i></i></label><div class="ur-tekst"><input class="ur-project" list="uren-projecten" data-veld="project" placeholder="Project"><input class="ur-werk" data-veld="werkzaamheden" placeholder="Wat heb je gedaan?"><div class="ur-voet"><small>nieuwe regel</small>${stepper(1)}</div></div></div>`);
-        nw.previousElementSibling.querySelector(".ur-project").focus(); tel();
+      const plus = e.target.closest(".ur-plus");
+      if (plus) {
+        const kaart = m.querySelector(`.uren-kaart-lijst[data-dag="${plus.dataset.dag}"]`);
+        const vgl = kaart.querySelector(".ur-vgl-lijst");
+        if (vgl) vgl.insertAdjacentHTML("beforebegin", rijHtml("nieuw", plus.dataset.dag));
+        else kaart.insertAdjacentHTML("beforeend", rijHtml("nieuw", plus.dataset.dag));
+        const nieuwe = [...kaart.querySelectorAll('.ur-rij[data-i="nieuw"]')].pop();
+        navigator.vibrate?.(8); tel();
+        kiezer(nieuwe.querySelector('[data-kies="project"]'));
+        return;
       }
+      const weg = e.target.closest(".ur-weg");
+      if (weg) {
+        const el = weg.closest(".ur-rij"), ouder = el.parentElement, na = el.nextSibling;
+        el.remove(); tel();
+        this.toast("Regel weggehaald", { knop: "Ongedaan", ongedaan: () => { ouder.insertBefore(el, na && na.parentElement === ouder ? na : null); tel(); } });
+        return;
+      }
+      const ks = e.target.closest("[data-kies]");
+      if (ks) kiezer(ks);
     });
+    // Zoekbare keuzelijst (zelfde als in de uren-app): project uit de historie, werk uit eerdere omschrijvingen van dat project
+    const kiezer = (knop) => {
+      const rijEl = knop.closest(".ur-rij"), soort = knop.dataset.kies;
+      const pInp = rijEl.querySelector('[data-veld="project"]'), wInp = rijEl.querySelector('[data-veld="werkzaamheden"]');
+      const opties = soort === "project" ? projecten : [...new Set([...voorbeelden(pInp.value), ...Object.values(perProject).flatMap((h) => h.voorbeelden || [])])];
+      document.querySelector(".kz-achter")?.remove();
+      const achter = document.createElement("div");
+      achter.className = "kz-achter";
+      achter.innerHTML = `<div class="kz" role="dialog" aria-label="${soort === "project" ? "Project kiezen" : "Omschrijving kiezen"}">
+          <div class="kz-kop"><span>${soort === "project" ? "Project" : "Wat heb je gedaan?"}</span><button type="button" class="kz-sluit" aria-label="Sluiten">${IC("ic-sluiten")}</button></div>
+          <input type="search" class="kz-zoek" placeholder="Zoeken…" autocomplete="off" enterkeyhint="done">
+          <ul class="kz-lijst"></ul></div>`;
+      document.body.appendChild(achter);
+      const zoek = achter.querySelector(".kz-zoek"), lijst = achter.querySelector(".kz-lijst");
+      zoek.value = soort === "project" ? pInp.value : "";
+      const sluit = () => achter.remove();
+      const kies = (w) => {
+        if (soort === "project") {
+          pInp.value = w;
+          knop.querySelector("span").textContent = w || "Kies project";
+          knop.classList.toggle("leeg", !w);
+          if (w && !wInp.value) wInp.focus();
+        } else wInp.value = w;
+        sluit(); tel();
+      };
+      const toon = () => {
+        const q = zoek.value.trim(), ql = q.toLowerCase();
+        const rang = (o) => { const l = o.toLowerCase(); return l.startsWith(ql) ? 0 : l.split(/[\s\-_/]+/).some((x) => x.startsWith(ql)) ? 1 : 2; };
+        const hits = (ql ? opties.filter((o) => o.toLowerCase().includes(ql)).sort((a, b) => rang(a) - rang(b)) : opties).slice(0, 60);
+        const nieuw = q && !opties.some((o) => o.toLowerCase() === ql);
+        lijst.innerHTML = hits.map((o) => `<li data-w="${esc(o)}"${soort === "project" && o === pInp.value ? ' class="gekozen"' : ""}>${esc(o)}</li>`).join("")
+          + (nieuw ? `<li class="kz-nieuw" data-w="${esc(q)}">${IC("ic-plus")}Nieuw: ${esc(q)}</li>` : "")
+          + (!hits.length && !nieuw ? `<li class="kz-leeg">${soort === "project" ? "Typ om een project te zoeken" : "Nog geen eerdere omschrijvingen"}</li>` : "");
+      };
+      achter.addEventListener("click", (e) => {
+        if (e.target === achter || e.target.closest(".kz-sluit")) return sluit();
+        const li = e.target.closest("li[data-w]"); if (li) kies(li.dataset.w);
+      });
+      zoek.addEventListener("input", toon);
+      zoek.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") sluit();
+        if (e.key === "Enter") { e.preventDefault(); const eerste = lijst.querySelector("li[data-w]"); if (eerste) kies(eerste.dataset.w); }
+      });
+      toon();
+      setTimeout(() => zoek.focus(), 30);
+    };
     m.querySelectorAll("[data-veld=uren]").forEach((i) => i.addEventListener("blur", () => { i.value = n(getal(i.value)); tel(); }));
     tel();
     m.querySelector("#uren-terug").addEventListener("click", () => { this.urenOpen = false; this.render(); });
     m.querySelector("#uren-meet").addEventListener("click", async (e) => {
       const b2 = e.currentTarget; b2.disabled = true; b2.classList.add("draait"); this.toast("Opnieuw meten, duurt ongeveer een minuut…");
-      try { await Api.urenMeet(); this.render(); } catch (err) { this.toast(err.message, { fout: true }); b2.disabled = false; b2.classList.remove("draait"); }
+      const klaar = () => { b2.disabled = false; b2.classList.remove("draait"); };
+      try {
+        const voor = v.gemaakt || "";
+        await Api.urenMeet();
+        // Meten draait op de Pi op de achtergrond; hier alleen even kijken tot het nieuwe voorstel er is (max 4 min)
+        for (let t = 0; t < 60; t++) {
+          await new Promise((r) => setTimeout(r, 4000));
+          if (!this.urenOpen || !document.body.contains(b2)) return;
+          let x; try { x = await Api.urenVoorstel(); } catch (_) { continue; }   // tijdelijk geen verbinding: gewoon doorproberen
+          if (x.meten?.fout) { klaar(); return this.toast("Meten mislukt: " + x.meten.fout, { fout: true }); }
+          if ((x.voorstel?.gemaakt || "") !== voor && !x.meten?.bezig) { this.toast("Opnieuw gemeten"); return this.render(); }
+        }
+        klaar(); this.toast("Meten duurt lang; kijk zo nog even", { fout: true });
+      } catch (err) { this.toast(err.message, { fout: true }); klaar(); }
     });
     knop.addEventListener("click", async () => {
       const l = tel(); if (!l.length) return;

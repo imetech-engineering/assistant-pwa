@@ -557,3 +557,43 @@ html body { height: var(--app-h, 100dvh); }
 .ur-vgl-kolommen .ur-getal { font-size: 0.6875rem; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: .03em; }
 .ur-vgl-totaal { padding-top: 6px; border-top: 1px solid var(--border-strong); font-size: 0.8125rem; }
 .ur-vgl-totaal .ur-vgl-naam { color: var(--text-secondary); font-weight: 500; }
+
+/* --- Uren-invoer (redesign sep 2026): compacte rij, zoekbare projectkeuze, prullenbak, plus in de dagkop --- */
+.ur-dag-kop { display: flex; align-items: center; gap: 8px; }
+.ur-dag-kop .dag-totaal { margin-left: auto; font-weight: 600; }
+.ur-plus { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-height: 0; min-width: 0; padding: 0; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--bg-primary); color: var(--accent); cursor: pointer; }
+.ur-plus:active { background: var(--accent-light); }
+.ur-plus .ic { width: 18px; height: 18px; }
+.uren-kaart-lijst:empty { display: none; }
+.ur-rij { display: block; padding: 10px 12px 10px 14px; }
+.ur-boven { display: flex; align-items: center; gap: 6px; }
+.ur-kies { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 8px; margin-left: -8px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--text-primary); font-size: 0.9375rem; font-weight: 600; text-align: left; cursor: pointer; }
+.ur-kies span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ur-kies .ic { width: 16px; height: 16px; color: var(--text-tertiary); }
+.ur-kies:active { background: var(--bg-hover); }
+.ur-kies.leeg { color: var(--accent); font-weight: 500; border: 1px dashed var(--border-strong); margin-left: 0; }
+.ur-weg { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; min-height: 0; min-width: 0; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-tertiary); cursor: pointer; }
+.ur-weg:active { background: var(--danger-light); color: var(--danger); }
+.ur-weg .ic { width: 18px; height: 18px; }
+.ur-werk-wrap { display: flex; align-items: center; margin-top: 2px; }
+.ur-werk-wrap .ur-werk { flex: 1; min-width: 0; min-height: 32px; padding: 4px 8px; margin-left: -8px; border: 1px solid transparent; border-radius: 6px; background: transparent; font-size: 0.875rem; color: var(--text-secondary); }
+.ur-werk-wrap .ur-werk:focus { border-color: var(--border-strong); background: var(--bg-secondary); color: var(--text-primary); outline: none; }
+.ur-werk-kies { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 32px; min-height: 0; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text-tertiary); cursor: pointer; }
+.ur-werk-kies .ic { width: 16px; height: 16px; }
+.ur-rij .ur-voet { margin-top: 4px; }
+.ur-rij .stepper button { width: 34px; height: 34px; }
+.ur-rij .stepper input { height: 34px; }
+
+/* Zoekbare keuzelijst (zelfde gedrag als de combobox in de uren-app) */
+.kz-achter { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-start; justify-content: center; padding: calc(56px + var(--safe-top)) 12px 12px; background: rgba(0,0,0,.35); }
+.kz { width: 100%; max-width: 480px; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,.25); }
+.kz-kop { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 0 14px; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); }
+.kz-sluit { width: 36px; height: 36px; min-height: 0; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; }
+.kz-zoek { margin: 8px; width: calc(100% - 16px); }
+.kz-lijst { list-style: none; margin: 0; padding: 0 0 6px; overflow-y: auto; }
+.kz-lijst li { padding: 11px 14px; font-size: 0.9375rem; border-top: 1px solid var(--border); cursor: pointer; }
+.kz-lijst li:active { background: var(--accent-light); }
+.kz-lijst li.gekozen { color: var(--accent); font-weight: 600; }
+.kz-lijst li.kz-nieuw { display: flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 500; }
+.kz-lijst li.kz-nieuw .ic { width: 16px; height: 16px; }
+.kz-lijst li.kz-leeg { color: var(--text-tertiary); cursor: default; }

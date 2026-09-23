@@ -4,11 +4,16 @@ const Api = {
   async call(pad, opties = {}) {
     const c = await this._cfg();
     if (!c.adres || !c.token) throw new Error("Vul eerst adres en token in bij Instellingen");
-    const r = await fetch(c.adres.replace(/\/$/, "") + "/api" + pad, {
-      method: opties.method || "GET",
-      headers: { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" },
-      body: opties.body ? JSON.stringify(opties.body) : undefined,
-    });
+    let r;
+    try {
+      r = await fetch(c.adres.replace(/\/$/, "") + "/api" + pad, {
+        method: opties.method || "GET",
+        headers: { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" },
+        body: opties.body ? JSON.stringify(opties.body) : undefined,
+      });
+    } catch (_) {
+      throw new Error(navigator.onLine === false ? "Geen internet" : "Assistent even niet bereikbaar, probeer het zo nog eens");
+    }
     if (!r.ok) {
       let t = r.statusText;
       try { t = (await r.json()).detail || t; } catch (_) {}
@@ -39,7 +44,7 @@ const Api = {
   verbruik(dagen = 14) { return this.call("/verbruik?dagen=" + dagen); },
   verbruikGrens(tokens_week) { return this.call("/verbruik/grens", { method: "POST", body: { tokens_week } }); },
   urenVoorstel() { return this.call("/uren/voorstel"); },
-  urenMeet() { return this.call("/uren/voorstel", { method: "POST" }); },
+  urenMeet() { return this.call("/uren/voorstel?achtergrond=1", { method: "POST" }); },
   urenTimetick(regels) { return this.call("/uren/timetick", { method: "POST", body: { regels } }); },
   urenSchrijf(regels) { return this.call("/uren/schrijf", { method: "POST", body: { regels } }); },
   verbruikMaxGrens(max_pct) { return this.call("/verbruik/grens", { method: "POST", body: { max_pct } }); },
