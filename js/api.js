@@ -29,6 +29,7 @@ const Api = {
   pushTest() { return this.call("/push/test", { method: "POST" }); },
   verzamel(model = false) { return this.call("/run/verzamel?model=" + model, { method: "POST" }); },
   opdrachten() { return this.call("/opdrachten"); },
+  opdrachtNieuw(soort, tekst, project = "", contact = "") { return this.call("/opdrachten", { method: "POST", body: { soort, tekst, project, contact } }); },
   opdrachtAnnuleer(id) { return this.call(`/opdrachten/${id}/annuleer`, { method: "POST" }); },
   opdrachtGezien(id) { return this.call(`/opdrachten/${id}/gezien`, { method: "POST" }); },
   opdrachtOpnieuw(id) { return this.call(`/opdrachten/${id}/opnieuw`, { method: "POST" }); },

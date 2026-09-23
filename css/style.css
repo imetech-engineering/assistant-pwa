@@ -418,6 +418,10 @@ button.inst-knop:active, a.inst-knop:active, .inst-uit > summary:active { backgr
 .ag-briefje li { margin: 3px 0; line-height: 1.35; }
 .ag-briefje .ag-doel { margin: 0 0 4px; font-weight: 600; }
 .ag-briefje .stil { margin: 6px 0 0; font-size: 0.75rem; }
+.ag-briefje .ag-kop { margin: 8px 0 2px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); }
+.ag-briefje li b { font-weight: 600; }
+.ag-briefje .ag-nog { color: var(--text-tertiary); font-style: italic; }
+.ag-briefje .ag-verslag { margin-top: 10px; }
 @media (max-width: 380px) { .inst-kaart > .ag-briefje { padding-left: 14px; } }
 .inst-noot.leeg { padding: 14px; }
 /* Lijsten van punten en opdrachten in één kaart */

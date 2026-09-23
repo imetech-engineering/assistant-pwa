@@ -180,7 +180,7 @@ const App = {
           <span class="ag-tijd">${a.hele_dag ? "hele dag" : `${a.van}<small>${a.tot || ""}</small>`}</span>
           <span class="ag-tekst"><b>${esc(a.titel)}</b>${a.locatie ? `<small>${esc(a.locatie)}</small>` : ""}</span>
           ${b ? `<span class="ag-brief">Spiek<i class="inst-chev"></i></span>` : ""}
-        </div>${b ? `<div class="ag-briefje hidden">${b.doel ? `<p class="ag-doel">${esc(b.doel)}</p>` : ""}<ul>${(b.punten || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul><p class="stil">${esc(b.bron || "")}${b.link ? ` · <a href="${esc(b.link)}" target="_blank" rel="noopener">openen</a>` : ""}</p>${this.appLink("projectdoc", { tab: "loggen", project: b.project || a.titel, tekst: `${a.titel} (${v.datum}): ` }, "Loggen in projectdoc")}</div>` : ""}`;
+        </div>${b ? `<div class="ag-briefje hidden">${this.briefjeHtml(b)}<p class="stil">${esc(b.bron || "")}${b.link ? ` · <a href="${esc(b.link)}" target="_blank" rel="noopener">openen</a>` : ""}</p>${voorbij(a) ? `<button type="button" class="btn-secondary ag-verslag" data-verslag="${esc(JSON.stringify({ titel: a.titel, van: a.van, tot: a.tot, locatie: a.locatie || "", project: b.project || "", datum: v.datum }))}">${IC("ic-klok")} Verslag in projectdoc (uit Plaud)</button>` : ""}</div>` : ""}`;
     };
 
     m.innerHTML = `
@@ -221,6 +221,13 @@ const App = {
     m.querySelector("#naar-overzicht")?.addEventListener("click", naarOverzicht);
     m.querySelector("#alle-open")?.addEventListener("click", naarOverzicht);
     m.querySelector("#tegel-agenda")?.addEventListener("click", () => m.querySelector("#agenda-kop").scrollIntoView({ behavior: "smooth", block: "start" }));
+    m.querySelectorAll("[data-verslag]").forEach((knop) => knop.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const a = JSON.parse(knop.dataset.verslag);
+      const tekst = `Verwerk de meeting '${a.titel}' van ${a.datum} (${a.van}-${a.tot}${a.locatie ? ", " + a.locatie : ""}) in het projectlogboek: wat is besproken en afgesproken, met actiepunten. Haal de notities uit de Plaud-opname van die dag; gebruik mail en agenda als aanvulling.`;
+      try { await Api.opdrachtNieuw("projectdoc", tekst, a.project); knop.disabled = true; knop.textContent = "In de wachtrij"; this.toast("Verslag staat in de wachtrij, je krijgt een melding als het in het logboek staat"); }
+      catch (err) { this.toast(err.message, { fout: true }); }
+    }));
     m.querySelectorAll(".ag-rij[data-briefje]").forEach((r) => { const t = () => { r.classList.toggle("open"); r.nextElementSibling?.classList.toggle("hidden"); }; r.addEventListener("click", t); r.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); t(); } }); });
     m.querySelector("#uren-open")?.addEventListener("click", () => { this.urenOpen = true; this.render(); });
     m.querySelectorAll(".chip[data-vraag]").forEach((c) => c.addEventListener("click", () => this.stuur(c.dataset.vraag, false)));
@@ -356,6 +363,15 @@ const App = {
   },
 
   /* Koppelingen naar de andere IMeTech-apps (js/imetech-apps.js). */
+  briefjeHtml(b) {
+    // Nieuw formaat: doel, agendapunten met standpunt, ophalen, open. Oud formaat (alleen punten) blijft werken.
+    const lijst = (kop, items) => items?.length ? `<p class="ag-kop">${kop}</p><ul>${items.join("")}</ul>` : "";
+    if (!b.agendapunten) return `${b.doel ? `<p class="ag-doel">${esc(b.doel)}</p>` : ""}<ul>${(b.punten || []).map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
+    return `${b.doel ? `<p class="ag-doel">${esc(b.doel)}</p>` : ""}`
+      + lijst("Agenda en jouw standpunt", b.agendapunten.map((x) => `<li><b>${esc(x.punt)}</b>${x.standpunt ? `<br><span class="${/^nog bepalen/i.test(x.standpunt) ? "ag-nog" : ""}">${esc(x.standpunt)}</span>` : ""}</li>`))
+      + lijst("Wat je eruit wilt halen", (b.ophalen || []).map((x) => `<li>${esc(x)}</li>`))
+      + lijst("Nog open", (b.open || []).map((x) => `<li>${esc(x)}</li>`));
+  },
   appLink(app, params, label) {
     if (!window.IMeTechApps) return "";
     return `<a class="app-link" href="${esc(IMeTechApps.url(app, params))}">${esc(label)} ${IC("ic-chevron")}</a>`;
