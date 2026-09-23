@@ -435,6 +435,8 @@ const App = {
     try { d = await Api.urenVoorstel(); } catch (e) { m.innerHTML = `<p class="fout">${esc(e.message)}</p>`; return; }
     const v = d.voorstel || {}, hist = d.historie || [];
     const perProject = Object.fromEntries(hist.map((h) => [h.project, h]));
+    const mt = d.meten || {};
+    const meetBezig = !!mt.bezig && (!mt.start || Date.now() - new Date(mt.start).getTime() < 5 * 60e3);
     const regels = v.regels || [];
     const isOpen = (r) => ["schrijven", "aanvullen"].includes(r.status) && r.voorstel_uren > 0 && !r.geschreven_via_app;
     const open = regels.filter(isOpen), rest = regels.filter((r) => !isOpen(r));
@@ -495,6 +497,7 @@ const App = {
         <div><p class="scherm-titel">Uren</p><p class="scherm-sub">Gemeten sinds ${v.gisteren ? dagNaam(v.gisteren) + " 17:00" : "gisteren"}</p></div>
         <button type="button" class="btn-rond" id="uren-meet" aria-label="Opnieuw meten" title="Opnieuw meten">${IC("ic-herstel")}</button>
       </div>
+      ${meetBezig ? `<p class="melding-let-op" id="uren-meet-status">Bezig met meten op de Pi… dit scherm ververst vanzelf.</p>` : mt.fout ? `<p class="melding-let-op">Laatste meting mislukt${mt.klaar ? " (" + new Date(mt.klaar).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }) + ")" : ""}: ${esc(mt.fout)}</p>` : !v.gemaakt ? `<p class="melding-let-op">Nog geen meting beschikbaar. Tik op ${IC("ic-herstel")} om te meten.</p>` : ""}
       ${v.voetnoot ? `<p class="melding-let-op">${esc(v.voetnoot)}</p>` : ""}
       ${!open.length ? `<p class="melding-goed">Alles geschreven ✓</p>` : ""}
       ${dagen.map(dagBlok).join("")}
@@ -597,22 +600,25 @@ const App = {
     m.querySelectorAll("[data-veld=uren]").forEach((i) => i.addEventListener("blur", () => { i.value = n(getal(i.value)); tel(); }));
     tel();
     m.querySelector("#uren-terug").addEventListener("click", () => { this.urenOpen = false; this.render(); });
-    m.querySelector("#uren-meet").addEventListener("click", async (e) => {
-      const b2 = e.currentTarget; b2.disabled = true; b2.classList.add("draait"); this.toast("Opnieuw meten, duurt ongeveer een minuut…");
-      const klaar = () => { b2.disabled = false; b2.classList.remove("draait"); };
-      try {
-        const voor = v.gemaakt || "";
-        await Api.urenMeet();
-        // Meten draait op de Pi op de achtergrond; hier alleen even kijken tot het nieuwe voorstel er is (max 4 min)
-        for (let t = 0; t < 60; t++) {
-          await new Promise((r) => setTimeout(r, 4000));
-          if (!this.urenOpen || !document.body.contains(b2)) return;
-          let x; try { x = await Api.urenVoorstel(); } catch (_) { continue; }   // tijdelijk geen verbinding: gewoon doorproberen
-          if (x.meten?.fout) { klaar(); return this.toast("Meten mislukt: " + x.meten.fout, { fout: true }); }
-          if ((x.voorstel?.gemaakt || "") !== voor && !x.meten?.bezig) { this.toast("Opnieuw gemeten"); return this.render(); }
-        }
-        klaar(); this.toast("Meten duurt lang; kijk zo nog even", { fout: true });
-      } catch (err) { this.toast(err.message, { fout: true }); klaar(); }
+    // Meten draait op de Pi op de achtergrond; dit scherm kijkt elke paar seconden of het klaar is, ook na terugkomen in de app
+    const wachtOpMeting = async (voor) => {
+      const b2 = m.querySelector("#uren-meet"); b2.disabled = true; b2.classList.add("draait");
+      for (let t = 0; t < 75; t++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        if (!this.urenOpen || !document.body.contains(b2)) return;
+        let x; try { x = await Api.urenVoorstel(); } catch (_) { continue; }   // even geen verbinding: doorproberen
+        if (x.meten?.bezig) continue;
+        if (x.meten?.fout) this.toast("Meten mislukt: " + x.meten.fout, { fout: true });
+        else if ((x.voorstel?.gemaakt || "") !== voor) this.toast("Opnieuw gemeten");
+        return this.render();
+      }
+      b2.disabled = false; b2.classList.remove("draait");
+    };
+    if (meetBezig) wachtOpMeting(v.gemaakt || "");
+    m.querySelector("#uren-meet").addEventListener("click", async () => {
+      this.toast("Opnieuw meten, duurt ongeveer een minuut…");
+      try { await Api.urenMeet(); this.render(); }   // opnieuw tekenen toont "Bezig met meten" en start het wachten
+      catch (err) { this.toast(err.message, { fout: true }); }
     });
     knop.addEventListener("click", async () => {
       const l = tel(); if (!l.length) return;
