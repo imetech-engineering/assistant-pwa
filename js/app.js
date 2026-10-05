@@ -715,7 +715,9 @@ const App = {
           <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>`}
           <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>
           ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}
-          ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}`}
+          ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}
+          ${it.meta?.actie && !it.meta?.opdracht_id ? `<button type="button" data-uitvoeren="${it.id}">${IC("ic-vink")} ${esc({ projectdoc: "Verwerk in projectdoc", offerte: "Offerteconcept maken", nieuw_project: "Project aanmaken", mailconcept: "Concept klaarzetten" }[it.meta.actie] || "Uitvoeren")}</button>` : ""}
+          ${it.meta?.opdracht_id ? `<p class="stil">Opdracht gegeven, wacht op uitvoering</p>` : ""}`}
           ${this.appLinks(it)}
         </div>
       </div>
@@ -731,6 +733,11 @@ const App = {
     root.querySelectorAll(".item .acties button[data-herinnering]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try { await Api.herinnering(b.dataset.herinnering); this.toast("Wordt klaargezet, je krijgt een melding als het concept in Outlook staat"); }
+      catch (e) { b.disabled = false; this.toast(e.message, { fout: true }); }
+    }));
+    root.querySelectorAll(".item .acties button[data-uitvoeren]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await Api.uitvoeren(b.dataset.uitvoeren); this.toast("Opdracht gegeven, je krijgt een melding als het klaar is"); }
       catch (e) { b.disabled = false; this.toast(e.message, { fout: true }); }
     }));
     root.querySelectorAll(".item .acties button[data-actie]").forEach((b) => b.addEventListener("click", async () => {
