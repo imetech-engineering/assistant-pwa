@@ -39,6 +39,8 @@ const Api = {
   opdrachtAnnuleer(id) { return this.call(`/opdrachten/${id}/annuleer`, { method: "POST" }); },
   opdrachtGezien(id) { return this.call(`/opdrachten/${id}/gezien`, { method: "POST" }); },
   opdrachtOpnieuw(id) { return this.call(`/opdrachten/${id}/opnieuw`, { method: "POST" }); },
+  opdrachtKies(id, vraag, optie) { return this.call(`/opdrachten/${id}/kies`, { method: "POST", body: { vraag, optie } }); },
+  opdrachtHerstel(id, vraag) { return this.call(`/opdrachten/${id}/herstel`, { method: "POST", body: { vraag } }); },
   wbso(jaar) { return this.call("/instellingen/wbso" + (jaar ? "?jaar=" + jaar : "")); },
   wbsoZet(jaar, projecten) { return this.call("/instellingen/wbso", { method: "POST", body: { jaar, projecten } }); },
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },

@@ -597,3 +597,15 @@ html body { height: var(--app-h, 100dvh); }
 .kz-lijst li.kz-nieuw { display: flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 500; }
 .kz-lijst li.kz-nieuw .ic { width: 16px; height: 16px; }
 .kz-lijst li.kz-leeg { color: var(--text-tertiary); cursor: default; }
+
+/* Keuzevraag in een opdrachtkaart: grote, duidelijke knoppen, één tik = beslist */
+.opdracht .keuze { margin-top: 10px; }
+.opdracht .keuze-vraag { font-weight: 600; margin: 0 0 6px; }
+.opdracht .keuze-opties { display: flex; flex-direction: column; gap: 6px; }
+.opdracht .keuze-opties button { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left;
+  background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); border-radius: 10px; font: inherit; cursor: pointer; }
+.opdracht .keuze-opties button span { font-size: 0.75rem; opacity: .75; }
+.opdracht .keuze-opties button:active { background: var(--accent); color: #fff; }
+.opdracht .keuze-opties button:disabled { opacity: .5; }
+.opdracht .keuze-gekozen { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.875rem; }
+.opdracht .keuze-gekozen .ic { width: 14px; height: 14px; }

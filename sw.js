@@ -1,7 +1,7 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v49";
+const CACHE = "assistent-v50";
 const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
@@ -19,7 +19,8 @@ self.addEventListener("fetch", (e) => {
 self.addEventListener("push", (e) => {
   let d = {};
   try { d = e.data.json(); } catch (_) { d = { titel: "Assistent", body: e.data ? e.data.text() : "" }; }
-  const acties = d.soort === "vertrek" ? [{ action: "route", title: "Route" }]
+  const acties = d.soort === "keuze" && d.vraag ? d.vraag.opties.slice(0, 2).map((t, i) => ({ action: "kies:" + i, title: t }))
+    : d.soort === "vertrek" ? [{ action: "route", title: "Route" }]
     : d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
     : d.soort === "stil" ? [{ action: "houd", title: "Laten staan" }, { action: "dismiss", title: "Weg" }]
     : d.soort === "logboek" && d.opdracht ? [{ action: "opdracht", title: "Ja, verwerken" }]
@@ -38,6 +39,10 @@ self.addEventListener("push", (e) => {
 self.addEventListener("notificationclick", (e) => {
   const d = e.notification.data || {};
   e.notification.close();
+  if (e.action && e.action.startsWith("kies:") && d.vraag) {
+    e.waitUntil(kies(d.opdracht_id, d.vraag.id, Number(e.action.slice(5)), d.vraag.opties));
+    return;
+  }
   if (e.action === "opdracht" && d.opdracht) {
     e.waitUntil(opdracht(d.opdracht));
     return;
@@ -63,6 +68,19 @@ self.addEventListener("notificationclick", (e) => {
     return self.clients.openWindow(doel);
   }));
 });
+
+async function kies(oid, vid, i, labels) {
+  const c = await Opslag.instellingen();
+  if (!c.adres || !c.token) return;
+  try {
+    const r = await fetch(c.adres.replace(/\/$/, "") + `/api/opdrachten/${oid}/kies`, { method: "POST", headers: { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" }, body: JSON.stringify({ vraag: vid, optie: i }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "fout");
+    await self.registration.showNotification((labels[i] || "Keuze") + " gekozen", { body: "Wordt ingevoerd. Ongedaan maken kan in de app.", icon: "icons/icon-192.png", tag: "bevestiging", silent: true });
+    (await self.clients.matchAll({ type: "window" })).forEach(x => x.postMessage({ type: "vernieuw" }));
+  } catch (e) {
+    await self.registration.showNotification("Niet gelukt", { body: (e.message && e.message !== "fout" ? e.message + ". " : "") + "Open de app en kies daar.", icon: "icons/icon-192.png", tag: "bevestiging" });
+  }
+}
 
 async function opdracht(o) {
   const c = await Opslag.instellingen();

@@ -235,6 +235,19 @@ const App = {
     m.querySelectorAll("[data-opdracht-annuleer]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtAnnuleer(b.dataset.opdrachtAnnuleer); this.toast("Opdracht geannuleerd"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     m.querySelectorAll("[data-opdracht-opnieuw]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtOpnieuw(b.dataset.opdrachtOpnieuw); this.toast("Opnieuw klaargezet, wordt binnen een uur opgepakt"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
     m.querySelectorAll("[data-opdracht-gezien]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtGezien(b.dataset.opdrachtGezien); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
+    // Keuzevraag in een opdrachtkaart: één tik = beslist, met ongedaan maken zolang het vervolg nog niet is uitgevoerd.
+    m.querySelectorAll("[data-keuze]").forEach((b) => b.addEventListener("click", async () => {
+      const [oid, vid, i] = b.dataset.keuze.split("|");
+      b.closest(".keuze")?.querySelectorAll("button").forEach((x) => { x.disabled = true; });
+      try {
+        const r = await Api.opdrachtKies(oid, vid, Number(i));
+        this.toast(`${r.label} gekozen, wordt ingevoerd`, { knop: "Ongedaan", ongedaan: async () => {
+          try { await Api.opdrachtHerstel(oid, vid); this.toast("Keuze teruggedraaid"); } catch (e) { this.toast(e.message, { fout: true }); }
+          this.render();
+        } });
+      } catch (e) { this.toast(e.message, { fout: true }); }
+      this.render();
+    }));
     const input = m.querySelector("#vraag-tekst");
     // Het veld groeit mee met de tekst (ook bij inspreken), zodat je een lang bericht kunt nalezen.
     const groei = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight + 2, 168) + "px"; input.classList.toggle("vol", input.scrollHeight > 168); };
@@ -260,13 +273,22 @@ const App = {
       ${o.context?.project || o.context?.contact ? `<p class="sub">${[o.context.project, o.context.contact].filter(Boolean).map(esc).join(" · ")}</p>` : ""}
       <p class="stil">${esc(o.tekst)}</p>
       ${o.resultaat ? `<p class="omschr">${esc(o.resultaat.replace(/https?:\/\/\S+/, "").trim())}</p>` : o.status === "wacht" ? `<p class="hint">Wordt binnen een uur opgepakt; je krijgt een melding.</p>` : ""}
+      ${this.vragenHtml(o)}
       <div class="rij">
         ${link ? `<a class="btn-link" href="${esc(link[0])}" target="_blank" rel="noopener">Openen ${IC("ic-chevron")}</a>` : ""}
         ${o.status === "wacht" ? `<button type="button" class="btn-secondary" data-opdracht-annuleer="${o.id}">Annuleren</button>` : ""}
-        ${o.status === "mislukt" ? `<button type="button" class="btn-secondary" data-opdracht-opnieuw="${o.id}">${IC("ic-herstel")} Opnieuw</button>` : ""}
+        ${o.status === "mislukt" && !(o.context?.vragen || []).some((v) => v.gekozen == null) ? `<button type="button" class="btn-secondary" data-opdracht-opnieuw="${o.id}">${IC("ic-herstel")} Opnieuw</button>` : ""}
         ${o.status === "klaar" || o.status === "mislukt" ? `<button type="button" class="btn-secondary" data-opdracht-gezien="${o.id}">${IC("ic-vink")} Gezien</button>` : ""}
       </div>
     </div>`;
+  },
+
+  vragenHtml(o) {
+    const vs = o.context?.vragen || [];
+    return vs.map((v) => v.gekozen != null
+      ? `<p class="keuze-gekozen">${IC("ic-vink")} ${esc(v.opties[v.gekozen]?.label || "")}</p>`
+      : `<div class="keuze"><p class="keuze-vraag">${esc(v.tekst)}</p><div class="keuze-opties">${v.opties.map((x, i) =>
+          `<button type="button" data-keuze="${o.id}|${esc(v.id)}|${i}"><b>${esc(x.label)}</b>${x.sub ? `<span>${esc(x.sub)}</span>` : ""}</button>`).join("")}</div></div>`).join("");
   },
 
   belHtml(b) {
