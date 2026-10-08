@@ -1,7 +1,7 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v48";
+const CACHE = "assistent-v49";
 const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
@@ -51,7 +51,7 @@ self.addEventListener("notificationclick", (e) => {
     e.waitUntil(self.clients.openWindow("https://imetech-engineering.github.io/projectdoc-pwa/?" + q));
     return;
   }
-  if (d.url) {   // vertrekmelding: route openen
+  if (d.url && /^https?:\/\//.test(d.url)) {   // vertrekmelding: route openen (alleen een volledige link; "/" zou github.io openen)
     e.waitUntil(self.clients.openWindow(d.url));
     return;
   }
