@@ -750,7 +750,7 @@ const App = {
     achter.innerHTML = `<div class="kz ps-kz" role="dialog" aria-label="Fase van ${esc(project)}">
         <div class="kz-kop"><span>${esc(project)}</span><button type="button" class="kz-sluit" aria-label="Sluiten">${IC("ic-sluiten")}</button></div>
         ${r.toelichting ? `<p class="ps-kz-toel">${esc(r.toelichting)}</p>` : ""}
-        ${r.excel_status ? `<p class="ps-kz-excel">Urenadministratie: <b>${esc(r.excel_status)}</b>${r.offerte ? " · " + esc(r.offerte) : ""}<span class="stil"> (${esc(r.excel_project)})</span></p>` : ""}
+        ${r.excel_status ? `<p class="ps-kz-excel">Urenadministratie: <b>${esc(r.excel_status)}</b>${r.offerte ? " · " + esc(r.offerte) : ""}<span class="stil"> (${esc(r.excel_project)})</span>${r.excel_log ? `<br><span class="stil">Door assistent bijgewerkt ${esc(r.excel_log)}</span>` : ""}</p>` : ""}
         <ul class="kz-lijst">${this._ps.fasen.map((f) => `<li data-fase="${f.fase}"${f.fase === r.fase ? ' class="gekozen"' : ""}><span class="ps-stip ${f.kleur}"></span><span class="ps-li-tekst">${esc(f.label)}</span>${f.fase === r.fase ? IC("ic-vink") : ""}</li>`).join("")}</ul>
         <div class="ps-kz-voet">
           ${r.bron === "hand" ? `<button type="button" data-auto="1">${IC("ic-herstel")} Automatisch${r.auto_label ? ": " + esc(r.auto_label) : ""}</button>` : `<p class="stil">Fase wordt automatisch bijgehouden. Kies hierboven om zelf bij te stellen; bij een nieuwe automatische wijziging neemt de assistent het weer over.</p>`}
