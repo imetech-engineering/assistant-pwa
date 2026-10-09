@@ -609,3 +609,35 @@ html body { height: var(--app-h, 100dvh); }
 .opdracht .keuze-opties button:disabled { opacity: .5; }
 .opdracht .keuze-gekozen { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 0.875rem; }
 .opdracht .keuze-gekozen .ic { width: 14px; height: 14px; }
+
+/* Lopende projecten (fase per project) */
+.ps-lijst { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+.ps-rij { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 10px 12px 10px 14px; font-weight: 400; color: var(--text-primary); }
+.ps-rij:active { background: var(--bg-hover); }
+.ps-rij > .ic { color: var(--text-tertiary); flex: none; }
+.ps-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ps-kop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ps-kop b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-dagen { font-size: 0.75rem; color: var(--text-tertiary); white-space: nowrap; flex: none; }
+.ps-fase { font-size: 0.8125rem; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.ps-hand { font-size: 0.6875rem; font-weight: 500; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
+.ps-toel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 0; }
+.ps-stip { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--border-strong); }
+.ps-stip.oranje { background: #f59e0b; } .ps-stip.blauw { background: var(--accent); } .ps-stip.groen { background: var(--goed); } .ps-stip.grijs { background: var(--border-strong); }
+.ps-fase.oranje { color: var(--let-op); } .ps-fase.blauw { color: var(--accent); } .ps-fase.groen { color: var(--goed); } .ps-fase.grijs { color: var(--text-secondary); }
+.ps-toggle { display: inline-flex; align-items: center; gap: 4px; margin: 2px 0 6px; color: var(--text-secondary); font-size: 0.8125rem; }
+.ps-toggle .ic { width: 16px; height: 16px; }
+.ps-klaar .ps-rij { opacity: .75; }
+.ps-kz { max-height: 80vh; }
+.ps-kz-toel { margin: 4px 14px 8px; font-size: 0.875rem; color: var(--text-secondary); }
+.ps-kz .kz-lijst li { display: flex; align-items: center; gap: 10px; }
+.ps-kz .kz-lijst li .ps-li-tekst { flex: 1; }
+.ps-kz .kz-lijst li .ic { width: 18px; height: 18px; color: var(--accent); }
+.ps-kz-voet { border-top: 1px solid var(--border); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ps-kz-voet .stil { margin: 0; font-size: 0.8125rem; }
+.ps-kz-voet > button { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
+.ps-kz-voet .app-links { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.ps-kz-voet .btn-link { display: inline-flex; align-items: center; gap: 4px; }
+.ps-offerte { font-size: 0.75rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.ps-kz-excel { margin: 0 14px 8px; font-size: 0.8125rem; color: var(--text-secondary); }
+.ps-kz-excel b { color: var(--text-primary); font-weight: 600; }

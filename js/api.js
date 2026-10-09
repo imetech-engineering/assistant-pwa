@@ -50,5 +50,8 @@ const Api = {
   urenMeet() { return this.call("/uren/voorstel?achtergrond=1", { method: "POST" }); },
   urenTimetick(regels) { return this.call("/uren/timetick", { method: "POST", body: { regels } }); },
   urenSchrijf(regels) { return this.call("/uren/schrijf", { method: "POST", body: { regels } }); },
+  projectstatus() { return this.call("/projectstatus"); },
+  projectFase(project, fase) { return this.call("/projectstatus", { method: "POST", body: { project, fase } }); },
+  projectFaseHerstel(project, vorig) { return this.call("/projectstatus/herstel", { method: "POST", body: { project, vorig } }); },
   verbruikMaxGrens(max_pct) { return this.call("/verbruik/grens", { method: "POST", body: { max_pct } }); },
 };

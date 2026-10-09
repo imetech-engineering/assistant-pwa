@@ -676,10 +676,16 @@ const App = {
 
   async rOverzicht(m) {
     const filter = this.cache.filter || "open";
-    const d = await Api.items(filter === "open" ? "open" : filter === "later" ? "snoozed" : "done,dismissed");
+    const [d, ps] = await Promise.all([
+      Api.items(filter === "open" ? "open" : filter === "later" ? "snoozed" : "done,dismissed"),
+      filter === "open" ? Api.projectstatus().catch(() => null) : Promise.resolve(null),
+    ]);
     if (filter === "open") document.getElementById("badge").textContent = d.items.length || "";
     const groepen = this.groepeer(d.items);
+    this._ps = ps;
     m.innerHTML = `
+      ${ps ? this.lopendHtml(ps, groepen) : ""}
+      ${ps?.projecten?.length ? `<h2>Open punten</h2>` : ""}
       <div class="chips">
         ${[["open", "Open"], ["later", "Uitgesteld"], ["klaar", "Afgerond"]].map(([f, l]) => `<button type="button" class="chip ${filter === f ? "actief" : ""}" data-filter="${f}">${l}</button>`).join("")}
       </div>
@@ -692,10 +698,89 @@ const App = {
         </button>`).join("") : `<p class="stil leeg">${filter === "open" ? "Niets open. Lekker." : "Niets hier."}</p>`}`;
     m.querySelectorAll(".chip[data-filter]").forEach((c) => c.addEventListener("click", () => { this.cache.filter = c.dataset.filter; this.render(); }));
     m.querySelectorAll(".groep").forEach((k) => k.addEventListener("click", () => { this.project = k.dataset.groep; this.render(); }));
+    m.querySelectorAll(".ps-rij").forEach((k) => k.addEventListener("click", () => this.faseKiezer(k.dataset.project, groepen)));
+    m.querySelector("#ps-dicht")?.addEventListener("click", () => { this.cache.psDicht = !this.cache.psDicht; this.render(); });
     m.querySelector("#nieuw")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const t = e.target.titel.value.trim(); if (!t) return;
       try { const r = await Api.chat("Nieuw punt: " + t); this.toast(r.antwoord || "Toegevoegd"); e.target.reset(); this.render(); } catch (err) { this.toast(err.message, { fout: true }); }
+    });
+  },
+
+  /* ---------- Lopende projecten: fase per project, bovenaan Overzicht ---------- */
+  lopendHtml(ps, groepen) {
+    const rijen = ps.projecten || [];
+    if (!rijen.length) return "";
+    const dicht = (r) => r.fase === "afgerond" || r.fase === "gestopt";
+    const open = rijen.filter((r) => !dicht(r)), klaar = rijen.filter(dicht);
+    const punten = (naam) => this.puntenVoor(naam, groepen)?.items.length || 0;
+    const rij = (r) => {
+      const n = punten(r.project);
+      const d = r.dagen == null ? "" : r.dagen === 0 ? "vandaag" : r.dagen === 1 ? "1 dag" : `${r.dagen} dagen`;
+      return `<button type="button" class="ps-rij" data-project="${esc(r.project)}">
+        <span class="ps-stip ${r.kleur}"></span>
+        <span class="ps-tekst">
+          <span class="ps-kop"><b>${esc(r.project)}</b>${d ? `<span class="ps-dagen">${d}</span>` : ""}</span>
+          <span class="ps-fase ${r.kleur}">${esc(r.label)}${r.bron === "hand" ? `<span class="ps-hand">zelf gezet</span>` : ""}</span>
+          ${r.offerte ? `<span class="ps-offerte">${esc(r.offerte)}</span>` : ""}
+          ${r.toelichting || n ? `<span class="sub ps-toel">${esc(r.toelichting || "")}${r.toelichting && n ? " · " : ""}${n ? `${n} open ${n === 1 ? "punt" : "punten"}` : ""}</span>` : ""}
+        </span>
+        ${IC("ic-chevron")}
+      </button>`;
+    };
+    return `<h2>Lopend · ${open.length}</h2>
+      <div class="ps-lijst">${open.map(rij).join("") || `<p class="stil leeg">Niets lopend.</p>`}</div>
+      ${klaar.length ? `<button type="button" class="btn-link ps-toggle" id="ps-dicht">${IC(this.cache.psDicht ? "ic-omlaag" : "ic-chevron")} Onlangs afgerond · ${klaar.length}</button>
+        ${this.cache.psDicht ? `<div class="ps-lijst ps-klaar">${klaar.map(rij).join("")}</div>` : ""}` : ""}`;
+  },
+
+  puntenVoor(naam, groepen) {
+    const t = (x) => new Set((x || "").toLowerCase().match(/[a-z0-9]+/g)?.filter((w) => w.length > 1 && !/^\d{4}$/.test(w)) || []);
+    const tn = t(naam);
+    return groepen.find((g) => g.isProject && (g.naam.toLowerCase() === naam.toLowerCase() || (() => { const tg = t(g.naam); return tg.size && tn.size && ([...tg].every((w) => tn.has(w)) || [...tn].every((w) => tg.has(w))); })()));
+  },
+
+  faseKiezer(project, groepen) {
+    const r = (this._ps?.projecten || []).find((x) => x.project === project);
+    if (!r) return;
+    const groep = this.puntenVoor(project, groepen);
+    document.querySelector(".kz-achter")?.remove();
+    const achter = document.createElement("div");
+    achter.className = "kz-achter";
+    achter.innerHTML = `<div class="kz ps-kz" role="dialog" aria-label="Fase van ${esc(project)}">
+        <div class="kz-kop"><span>${esc(project)}</span><button type="button" class="kz-sluit" aria-label="Sluiten">${IC("ic-sluiten")}</button></div>
+        ${r.toelichting ? `<p class="ps-kz-toel">${esc(r.toelichting)}</p>` : ""}
+        ${r.excel_status ? `<p class="ps-kz-excel">Urenadministratie: <b>${esc(r.excel_status)}</b>${r.offerte ? " · " + esc(r.offerte) : ""}<span class="stil"> (${esc(r.excel_project)})</span></p>` : ""}
+        <ul class="kz-lijst">${this._ps.fasen.map((f) => `<li data-fase="${f.fase}"${f.fase === r.fase ? ' class="gekozen"' : ""}><span class="ps-stip ${f.kleur}"></span><span class="ps-li-tekst">${esc(f.label)}</span>${f.fase === r.fase ? IC("ic-vink") : ""}</li>`).join("")}</ul>
+        <div class="ps-kz-voet">
+          ${r.bron === "hand" ? `<button type="button" data-auto="1">${IC("ic-herstel")} Automatisch${r.auto_label ? ": " + esc(r.auto_label) : ""}</button>` : `<p class="stil">Fase wordt automatisch bijgehouden. Kies hierboven om zelf bij te stellen; bij een nieuwe automatische wijziging neemt de assistent het weer over.</p>`}
+          <div class="app-links">
+            ${groep ? `<button type="button" class="app-link" data-punten="1">${groep.items.length} open ${groep.items.length === 1 ? "punt" : "punten"} ${IC("ic-chevron")}</button>` : ""}
+            ${r.projectdoc ? this.appLink("projectdoc", { project: r.nummer || project }, "Projectdoc") : ""}
+            ${r.excel_status ? this.appLink("uren", { tab: "projecten" }, "Uren-app") : ""}
+          </div>
+        </div></div>`;
+    document.body.appendChild(achter);
+    const sluit = () => { achter.remove(); window.Terug?.dicht("fase"); };
+    window.Terug?.sluiter("fase", () => achter.remove());
+    window.Terug?.open("fase");
+    const zet = async (fase) => {
+      sluit();
+      try {
+        const res = await Api.projectFase(project, fase);
+        this.toast(fase ? `${project}: ${this._ps.fasen.find((f) => f.fase === fase)?.label}` : `${project}: weer automatisch`, {
+          knop: "Ongedaan",
+          ongedaan: async () => { try { await Api.projectFaseHerstel(project, res.vorig); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } },
+        });
+        this.render();
+      } catch (e) { this.toast(e.message, { fout: true }); }
+    };
+    achter.addEventListener("click", (e) => {
+      if (e.target === achter || e.target.closest(".kz-sluit")) return sluit();
+      const li = e.target.closest("li[data-fase]");
+      if (li) return li.dataset.fase === r.fase && r.bron !== "hand" ? sluit() : zet(li.dataset.fase);
+      if (e.target.closest("[data-auto]")) return zet(null);
+      if (e.target.closest("[data-punten]")) { sluit(); this.project = groep.naam; this.render(); }
     });
   },
 
