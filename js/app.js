@@ -124,6 +124,9 @@ const App = {
 
   async render() {
     const m = document.getElementById("scherm");
+    // #scherm blijft hetzelfde element bij elke render: luisteraars van het vorige scherm (uren) eerst opruimen,
+    // anders stapelen ze zich op en telt elke tik op + of − meerdere keren.
+    this._urenAc?.abort(); this._urenAc = null;
     // Terugknop: eerst uren of projectdetail dicht, dan terug naar Assistent.
     if (window.Terug) {
       Terug.sluiter("tab", () => { this.project = null; this.ga("assistent"); });
@@ -469,8 +472,8 @@ const App = {
     const stepper = (uren) => `<div class="stepper"><button type="button" data-stap="-0.25" aria-label="Kwartier minder">−</button><input data-veld="uren" inputmode="decimal" value="${n(uren)}" aria-label="Uren"><button type="button" data-stap="0.25" aria-label="Kwartier meer">+</button></div>`;
     const projecten = hist.map((h) => h.project);
     const voorbeelden = (p) => (perProject[p]?.voorbeelden || []).slice().reverse();
-    const rijHtml = (i, datum, r = {}, meta = "nieuwe regel") => `
-      <div class="ur-rij" data-i="${i}" data-datum="${datum}">
+    const rijHtml = (i, datum, r = {}, meta = "nieuwe regel", key = "") => `
+      <div class="ur-rij" data-i="${i}" data-datum="${datum}" data-key="${esc(key)}">
         <div class="ur-boven">
           <button type="button" class="ur-kies${r.project ? "" : " leeg"}" data-kies="project"><span>${esc(r.project || "Kies project")}</span>${IC("ic-omlaag")}</button>
           <input type="hidden" data-veld="project" value="${esc(r.project || "")}">
@@ -482,9 +485,11 @@ const App = {
         </div>
         <div class="ur-voet"><small>${meta}</small>${stepper(r.voorstel_uren ?? 1)}</div>
       </div>`;
-    const rij = (r, i) => rijHtml(i, r.datum, r, `${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u`);
+    const rij = (r, i) => rijHtml(i, r.datum, r, `${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u`, rijSleutels[i]);
     // Geschreven (urenadministratie) naast gemeten, per project. Open regels staan hierboven al als invoer.
     const sleutel = (p) => { const nr = String(p || "").match(/^\s*(\d{4})/); return nr ? nr[1] : String(p || "").toLowerCase().replace(/\s+/g, ""); };
+    // Vaste sleutel per voorgestelde regel (datum, project, blok, volgnummer bij dubbelen): hiermee onthouden we je aanpassingen
+    const rijSleutels = (() => { const teller = {}; return open.map((r) => { const k = `${r.datum}|${sleutel(r.project)}|${r.blok || ""}`; teller[k] = (teller[k] || 0) + 1; return k + "|" + teller[k]; }); })();
     const vergelijk = (dag) => {
       const openKeys = new Set(open.filter((r) => r.datum === dag).map((r) => sleutel(r.project)));
       const per = new Map();
@@ -538,15 +543,43 @@ const App = {
         werkzaamheden: w("werkzaamheden").value.trim(), uren: getal(w("uren").value) };
     });
     const knop = m.querySelector("#uren-schrijf");
-    const tel = () => {
+    const ac = new AbortController(); this._urenAc = ac;
+    const sig = { signal: ac.signal };
+    // Concept: je aanpassingen (uren, project, omschrijving, weggehaalde en nieuwe regels) blijven bewaard
+    // tot je schrijft of er een nieuwe meting is; zo raak je ze niet kwijt als je de app even verlaat.
+    const CONCEPT = "assistent-uren-concept", meting = v.gemaakt || "";
+    const leesConcept = () => { try { const c = JSON.parse(localStorage.getItem(CONCEPT)); return c && c.gemaakt === meting && c.dag === vandaag ? c : null; } catch (_) { return null; } };
+    const wisConcept = () => { try { localStorage.removeItem(CONCEPT); } catch (_) {} };
+    const bewaarConcept = () => {
+      try {
+        const rijen = {}, nieuw = [];
+        m.querySelectorAll(".ur-rij").forEach((el) => {
+          const w = (k) => el.querySelector(`[data-veld="${k}"]`);
+          const o = { project: w("project").value, werkzaamheden: w("werkzaamheden").value, uren: w("uren").value };
+          if (el.dataset.i === "nieuw") nieuw.push({ datum: el.dataset.datum, ...o }); else rijen[el.dataset.key] = o;
+        });
+        const weg = rijSleutels.filter((k) => !(k in rijen));
+        localStorage.setItem(CONCEPT, JSON.stringify({ gemaakt: meting, dag: vandaag, rijen, nieuw, weg }));
+      } catch (_) {}
+    };
+    const tel = (bewaar = true) => {
       const alle = lees();
       m.querySelectorAll(".dag-totaal").forEach((t) => { const som = alle.filter((r) => r.aan && r.datum === t.dataset.dag).reduce((s2, r) => s2 + r.uren, 0); t.textContent = som ? n(som) + " u" : ""; });
       const l = alle.filter((r) => r.aan && r.project && r.uren > 0);
       knop.textContent = l.length ? `Schrijf ${l.length} ${l.length === 1 ? "regel" : "regels"} · ${n(l.reduce((s2, r) => s2 + r.uren, 0))} u` : "Niets om te schrijven";
       knop.disabled = !l.length;
+      if (bewaar) bewaarConcept();
       return l;
     };
-    m.addEventListener("input", tel); m.addEventListener("change", tel);
+    // Nieuwe (eigen) regel onder de voorgestelde regels van die dag, boven de vergelijking
+    const voegRegelToe = (dag, r = {}) => {
+      const kaart = m.querySelector(`.uren-kaart-lijst[data-dag="${dag}"]`); if (!kaart) return null;
+      const vgl = kaart.querySelector(".ur-vgl-lijst");
+      kaart.insertAdjacentHTML(vgl ? "beforebegin" : "beforeend", rijHtml("nieuw", dag, r));
+      if (vgl) { const nieuwe = vgl.previousElementSibling; return nieuwe; }
+      return kaart.lastElementChild;
+    };
+    m.addEventListener("input", () => tel(), sig); m.addEventListener("change", () => tel(), sig);
     m.addEventListener("click", (e) => {
       const st = e.target.closest("[data-stap]");
       if (st) { const inp = st.parentElement.querySelector("input"); inp.value = n(Math.max(0, getal(inp.value) + parseFloat(st.dataset.stap))); navigator.vibrate?.(8); tel(); return; }
@@ -554,11 +587,8 @@ const App = {
       if (vg) { vg.classList.toggle("open"); return; }
       const plus = e.target.closest(".ur-plus");
       if (plus) {
-        const kaart = m.querySelector(`.uren-kaart-lijst[data-dag="${plus.dataset.dag}"]`);
-        const vgl = kaart.querySelector(".ur-vgl-lijst");
-        if (vgl) vgl.insertAdjacentHTML("beforebegin", rijHtml("nieuw", plus.dataset.dag));
-        else kaart.insertAdjacentHTML("beforeend", rijHtml("nieuw", plus.dataset.dag));
-        const nieuwe = [...kaart.querySelectorAll('.ur-rij[data-i="nieuw"]')].pop();
+        const nieuwe = voegRegelToe(plus.dataset.dag);
+        if (!nieuwe) return;
         navigator.vibrate?.(8); tel();
         kiezer(nieuwe.querySelector('[data-kies="project"]'));
         return;
@@ -572,7 +602,7 @@ const App = {
       }
       const ks = e.target.closest("[data-kies]");
       if (ks) kiezer(ks);
-    });
+    }, sig);
     // Zoekbare keuzelijst (zelfde als in de uren-app): project uit de historie, werk uit eerdere omschrijvingen van dat project
     const kiezer = (knop) => {
       const rijEl = knop.closest(".ur-rij"), soort = knop.dataset.kies;
@@ -619,15 +649,27 @@ const App = {
       toon();
       setTimeout(() => zoek.focus(), 30);
     };
+    // Eerder bewaarde aanpassingen terugzetten (zelfde meting, zelfde dag)
+    const concept = leesConcept();
+    if (concept) {
+      const zetProject = (el, p) => { const kb = el.querySelector('[data-kies="project"]'); el.querySelector('[data-veld="project"]').value = p; kb.querySelector("span").textContent = p || "Kies project"; kb.classList.toggle("leeg", !p); };
+      const zet = (el, o) => { zetProject(el, o.project || ""); el.querySelector('[data-veld="werkzaamheden"]').value = o.werkzaamheden || ""; el.querySelector('[data-veld="uren"]').value = n(getal(o.uren)); };
+      m.querySelectorAll('.ur-rij:not([data-i="nieuw"])').forEach((el) => {
+        const k = el.dataset.key, o = concept.rijen?.[k];
+        if (!o && concept.weg?.includes(k)) el.remove(); else if (o) zet(el, o);
+      });
+      (concept.nieuw || []).forEach((o) => { const el = voegRegelToe(o.datum); if (el) zet(el, o); });
+    }
     m.querySelectorAll("[data-veld=uren]").forEach((i) => i.addEventListener("blur", () => { i.value = n(getal(i.value)); tel(); }));
-    tel();
+    tel(false);
     m.querySelector("#uren-terug").addEventListener("click", () => { this.urenOpen = false; this.render(); });
     // Meten draait op de Pi op de achtergrond; dit scherm kijkt elke paar seconden of het klaar is, ook na terugkomen in de app
     const wachtOpMeting = async (voor) => {
+      const wachtId = this._urenWachtId = (this._urenWachtId || 0) + 1;   // alleen de nieuwste wachtlus blijft draaien
       const b2 = m.querySelector("#uren-meet"); b2.disabled = true; b2.classList.add("draait");
       for (let t = 0; t < 150; t++) {
         await new Promise((r) => setTimeout(r, 4000));
-        if (!this.urenOpen || !document.body.contains(b2)) return;
+        if (!this.urenOpen || !document.body.contains(b2) || this._urenWachtId !== wachtId) return;
         let x; try { x = await Api.urenVoorstel(); } catch (_) { continue; }   // even geen verbinding: doorproberen
         if (x.meten?.bezig) continue;
         if (x.meten?.fout) this.toast("Meten mislukt: " + x.meten.fout, { fout: true });
@@ -648,6 +690,7 @@ const App = {
       try {
         const regels = l.map(({ aan, el, ...x }) => x);
         const r = await Api.urenSchrijf(regels);
+        if (r.ok) wisConcept();
         const r2r = regels.filter((x) => (/r2r/i.test(x.opdrachtgever || "") || /^\s*60\d\d/.test(x.project || "")) && Number(x.tarief) > 0);
         const tekst = r.ok ? `${r.geschreven} ${r.geschreven === 1 ? "regel" : "regels"} geschreven` : `${r.geschreven || 0} van ${r.totaal || l.length} geschreven${r.fout ? ": " + r.fout : ""}`;
         if (r.ok && r2r.length) {
