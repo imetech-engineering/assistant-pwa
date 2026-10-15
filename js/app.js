@@ -934,12 +934,35 @@ const App = {
     const mx = v.max || {}, a = v.aandeel, mg = v.grens_max_pct || 0;
     const wanneer = (s) => s ? datumKort(s) + " " + s.slice(11, 16) : "";
     const pct = (x) => (Math.round(x * 10) / 10).toString().replace(".", ",") + "%";
-    const namen = { ochtendbriefing: "Ochtendbriefing", avondcheck: "Avondcheck", triage: "Triage", chat: "Chat", opdracht: "Opdrachten", logboek: "Logboek", overig: "Overig" };
+    const namen = { ochtendbriefing: "Ochtendbriefing", avondcheck: "Avondcheck", triage: "Triage", chat: "Chat", opdracht: "Opdrachten", logboek: "Logboek", uren: "Urencheck", overig: "Overig" };
     const totaal = mx.week_pct, assist = a && !a.leert ? a.assistent_pct : null;
+    const usd = (x) => "$ " + (Math.round((x || 0) * 100) / 100).toFixed(2).replace(".", ",");
+    const kTokens = (x) => x >= 1e6 ? (Math.round(x / 1e5) / 10).toString().replace(".", ",") + " M" : x >= 1e3 ? Math.round(x / 1e3) + " k" : String(x || 0);
+
+    // Bron: API-credits (maandelijks bij Max) eerst, abonnement als terugval
+    const br = v.bronnen || {}, cr = br.credits || {}, ab = br.abonnement || {}, op = v.credits_op;
+    let bron = "";
+    if (v.api_key) {
+      const status = op
+        ? `<span class="bron-status nee">Credits op sinds ${esc(wanneer(op.sinds))}; alles loopt nu via je abonnement${op.opnieuw_over_s ? `, over ${Math.ceil(op.opnieuw_over_s / 60)} min opnieuw proberen` : ""}.</span>`
+        : v.voorkeur === "credits"
+          ? `<span class="bron-status ok">Eerst API-credits, bij "op" terugval op je abonnement.</span>`
+          : `<span class="bron-status ok">Eerst abonnement; credits als terugval (config: voorkeur).</span>`;
+      const regel = (naam, b, hint) => `<div class="bron-rij"><span class="bron-naam">${naam}<small>${hint}</small></span><span class="bron-cijfers"><b>${usd(b.maand?.kosten_usd)}</b><small>${b.maand?.runs || 0} runs · ${kTokens(b.maand?.tokens || 0)} tokens deze maand</small></span></div>`;
+      bron = `<h3 class="verbruik-sub">Bron</h3>
+        <div class="bronnen">
+          ${regel("API-credits", cr, "Console")}
+          ${regel("Abonnement", ab, "Max-week")}
+        </div>
+        ${status}
+        <p class="hint">Bedragen zijn een schatting uit tokens en prijstabel. De echte creditstand staat in de Claude Console onder Settings &rsaquo; Billing; de Pi kan die niet opvragen.</p>`;
+    } else {
+      bron = `<h3 class="verbruik-sub">Bron</h3><p class="hint">Alles loopt via je abonnement. Met een API-key (Max-credits, <code>sudo assistant-api-key</code> op de Pi) draait de assistent eerst op de credits.</p>`;
+    }
 
     let kop, balk = "", legenda = "";
     if (totaal == null) {
-      kop = `<p class="verbruik-kop">${v.max ? "Weekvenster is net gereset" : "Nog geen meting"}</p><p class="hint">Het volgende getal komt mee met de volgende run van de assistent.</p>`;
+      kop = `<p class="verbruik-kop">${v.max ? "Weekvenster is net gereset" : "Nog geen meting van je Max-week"}</p><p class="hint">${v.api_key && !op ? "Dat getal komt alleen mee met runs op het abonnement; zolang de credits het doen blijft het stil." : "Het volgende getal komt mee met de volgende run van de assistent."}</p>`;
     } else {
       kop = assist != null
         ? `<p class="verbruik-kop">Assistent ≈ ${Math.round(a.aandeel * 100)}% van je Claude-gebruik</p>
@@ -963,6 +986,8 @@ const App = {
     const topDag = Math.max(1e-9, ...(v.per_dag || []).map((x) => x.kosten_usd || 0));
     const dagen_ = v.per_dag || [];
     el.innerHTML = `
+      ${bron}
+      <h3 class="verbruik-sub">Max-abonnement</h3>
       ${kop}${balk}${legenda}
       ${soorten.length ? `<h3 class="verbruik-sub">Waar het in zit</h3>
         <div class="soorten">${soorten.map((x) => `<div class="soort"><span>${esc(namen[x.soort] || x.soort)}</span><span class="soort-balk"><i style="width:${Math.round(x.aandeel * 100)}%"></i></span><b>${Math.round(x.aandeel * 100)}%</b></div>`).join("")}</div>` : ""}
@@ -972,7 +997,7 @@ const App = {
       <div class="chips">${[7, 14, 30].map((n) => `<button type="button" class="chip ${n === dagen ? "actief" : ""}" data-dagen="${n}">${n} dagen</button>`).join("")}</div>
       <h3 class="verbruik-sub">Rem</h3>
       <div class="invoer-rij"><label for="verbruik-max">Geplande rondes overslaan boven</label><span class="getal"><input id="verbruik-max" type="number" min="0" max="100" step="5" value="${mg}" inputmode="numeric"><span>%</span></span><button type="button" id="verbruik-max-opslaan" class="btn-primary">Opslaan</button></div>
-      <p class="hint">Van je hele Max-week. Chat en opdrachten blijven altijd werken. 0 = uit.</p>`;
+      <p class="hint">Van je hele Max-week; geldt alleen voor runs op het abonnement, niet voor de API-credits. Chat en opdrachten blijven altijd werken. 0 = uit.</p>`;
     el.querySelectorAll(".chip[data-dagen]").forEach((b) => b.addEventListener("click", () => this.rVerbruik(el, parseInt(b.dataset.dagen, 10))));
     el.querySelector("#verbruik-max-opslaan").addEventListener("click", async () => {
       try { await Api.verbruikMaxGrens(parseInt(el.querySelector("#verbruik-max").value, 10) || 0); this.toast("Rem opgeslagen"); this.rVerbruik(el, dagen); }
@@ -1002,7 +1027,13 @@ const App = {
             <button type="submit" class="btn-primary">Opslaan en testen</button>
           </form>`)}
         ${rij("Microsoft", `${stip(s?.graph_gekoppeld)}${s ? (s.graph_gekoppeld ? "gekoppeld" : "niet gekoppeld") : "–"}`)}
-        ${rij("Claude", `${stip(s?.claude?.oauth_token || s?.claude?.api_key)}${s ? (s.claude.oauth_token ? "abonnement" : s.claude.api_key ? "API-key" : "niet gekoppeld") : "–"}`)}
+        ${rij("Claude", `${stip(s?.claude?.oauth_token || s?.claude?.api_key)}${s ? (() => {
+          const c = s.claude, beide = c.oauth_token && c.api_key;
+          if (!c.oauth_token && !c.api_key) return "niet gekoppeld";
+          if (c.credits_op) return beide ? "credits op, nu abonnement" : "credits op";
+          if (beide) return c.voorkeur === "credits" ? "API-credits, terugval abonnement" : "abonnement, terugval credits";
+          return c.api_key ? "API-credits" : "abonnement";
+        })() : "–"}`)}
       </div>
 
       <h2 class="inst-kop">Meldingen</h2>
