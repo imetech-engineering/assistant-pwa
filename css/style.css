@@ -651,3 +651,23 @@ html body { height: var(--app-h, 100dvh); }
 .ps-offerte { font-size: 0.75rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 .ps-kz-excel { margin: 0 14px 8px; font-size: 0.8125rem; color: var(--text-secondary); }
 .ps-kz-excel b { color: var(--text-primary); font-weight: 600; }
+
+/* ---------- Vraagt aandacht: knoppen direct zichtbaar, vegen rechts = gedaan, links = niet relevant ---------- */
+.aandacht-hint { margin: -4px 4px 8px; font-size: 0.75rem; color: var(--text-secondary); }
+.aandacht-item { position: relative; touch-action: pan-y; }
+.aandacht-item .veeg-voor { position: relative; background: var(--bg-primary); padding: 12px 14px; will-change: transform; }
+.aandacht-kop { display: flex; align-items: flex-start; gap: 10px; }
+.aandacht-kop .tekst { flex: 1; min-width: 0; }
+.aandacht-kop .titel { display: block; font-weight: 600; line-height: 1.3; }
+.aandacht-kop .prio { margin-top: 6px; }
+.aandacht-kop .tag { margin-top: 2px; flex-shrink: 0; }
+.aandacht-item .acties { margin-top: 8px; }
+.aandacht-item .reden-deadline { color: var(--danger); }
+.veeg-achter { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-weight: 600; font-size: 0.875rem; }
+.veeg-achter span { display: inline-flex; align-items: center; gap: 6px; opacity: 0; }
+.veeg-achter .ic { width: 18px; height: 18px; }
+.aandacht-item.veeg-r .veeg-achter { background: var(--goed-light); color: var(--goed); }
+.aandacht-item.veeg-r .veeg-goed { opacity: 1; }
+.aandacht-item.veeg-l .veeg-achter { background: var(--bg-hover); color: var(--text-secondary); justify-content: flex-end; }
+.aandacht-item.veeg-l .veeg-weg { opacity: 1; }
+.aandacht-item.veeg-l .veeg-goed { display: none; }

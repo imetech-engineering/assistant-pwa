@@ -1,7 +1,7 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v52";
+const CACHE = "assistent-v53";
 const SCHIL = ["./", "index.html", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
@@ -22,14 +22,14 @@ self.addEventListener("push", (e) => {
   const acties = d.soort === "keuze" && d.vraag ? d.vraag.opties.slice(0, 2).map((t, i) => ({ action: "kies:" + i, title: t }))
     : d.soort === "vertrek" ? [{ action: "route", title: "Route" }]
     : d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
-    : d.soort === "stil" ? [{ action: "houd", title: "Laten staan" }, { action: "dismiss", title: "Weg" }]
+    : d.soort === "stil" ? [{ action: "houd", title: "Laten staan" }, { action: "dismiss", title: "Niet relevant" }]
     : d.soort === "logboek" && d.opdracht ? [{ action: "opdracht", title: "Ja, verwerken" }]
     : d.acties && d.concept ? [{ action: "done", title: "Gedaan" }, { action: "concept", title: "Concept klaarzetten" }]
     : (d.acties ? [{ action: "done", title: "Gedaan" }, { action: "snooze", title: "Morgen" }] : []);
   e.waitUntil(Promise.all([
     self.registration.showNotification(d.titel || "Assistent", {
       body: d.body || "", icon: "icons/icon-192.png", badge: "icons/badge-96.png",
-      tag: d.item_id ? "item-" + d.item_id : d.soort || "info", renotify: !!d.item_id,
+      tag: d.item_id ? "item-" + d.item_id : d.soort || "info", renotify: false,
       data: d, actions: acties, vibrate: d.soort === "urgent" ? [120, 60, 120] : [80],
     }),
     self.clients.matchAll({ type: "window" }).then(cs => cs.forEach(c => c.postMessage({ type: "vernieuw" }))),
@@ -62,9 +62,10 @@ self.addEventListener("notificationclick", (e) => {
   }
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
     const uren = d.soort === "uren";
-    const doel = new URL("./?tab=" + (d.item_id ? "overzicht" : "assistent") + (uren ? "&uren=1" : ""), self.registration.scope).href;
+    const aandacht = !!d.item_id || d.soort === "aandacht";   // tik op een punt-melding: naar 'Vraagt aandacht' om het af te handelen
+    const doel = new URL("./?tab=assistent" + (uren ? "&uren=1" : aandacht ? "&aandacht=1" : ""), self.registration.scope).href;
     const c = cs.find(x => x.url.startsWith(self.registration.scope));
-    if (c) { c.focus(); c.postMessage({ type: uren ? "uren" : d.item_id ? "open_item" : "vernieuw", item_id: d.item_id }); return; }
+    if (c) { c.focus(); c.postMessage({ type: uren ? "uren" : aandacht ? "aandacht" : "vernieuw", item_id: d.item_id }); return; }
     return self.clients.openWindow(doel);
   }));
 });

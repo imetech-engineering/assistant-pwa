@@ -23,7 +23,7 @@ const App = {
       });
       navigator.serviceWorker.addEventListener("message", (e) => {
         if (e.data?.type === "vernieuw") this.render();
-        if (e.data?.type === "open_item") { this.project = null; this.ga("overzicht"); }
+        if (e.data?.type === "open_item" || e.data?.type === "aandacht") { this.project = null; this.naarAandacht = true; this.ga("assistent"); }
         if (e.data?.type === "uren") { this.urenOpen = true; this.ga("assistent"); }
       });
     }
@@ -33,6 +33,7 @@ const App = {
     const params = new URLSearchParams(location.search);
     if (params.get("tab")) this.tab = params.get("tab") === "vandaag" ? "assistent" : params.get("tab");
     if (params.get("uren")) this.urenOpen = true;
+    if (params.get("aandacht")) this.naarAandacht = true;
     const deel = [params.get("deel_tekst") || params.get("deel_titel"), params.get("deel_url")].filter(Boolean);
     if (deel.length) { this.deelTekst = [...new Set(deel)].join(" "); this.tab = "assistent"; window.IMeTechApps?.wisParams(); }
     window.addEventListener("online", () => this.verstuurWachtrij());
@@ -162,7 +163,8 @@ const App = {
     const voorbij = (a) => !a.hele_dag && a.tot && a.tot <= nu;
     const nog = afspraken.filter((a) => !voorbij(a));
     const eerstvolgende = nog.find((a) => !a.hele_dag && a.van > nu);
-    const dringend = v.top.filter((i) => i.prio_score >= 80);
+    const aandacht = v.aandacht || [];
+    const dringend = aandacht;
     const avond = uur >= 18;
     const morgen = (v.morgen && v.morgen.afspraken) || [];
     const n = (k) => `${k} afspra${k === 1 ? "ak" : "ken"}`;
@@ -192,13 +194,15 @@ const App = {
         <p class="hero-zin">${zin}</p>
         <div class="tegels">
           ${tegel("tegel-agenda", avond ? morgen.length : nog.length, avond ? "morgen" : nog.length === 1 ? "afspraak" : "afspraken", false)}
-          ${tegel("naar-overzicht", v.aantal_open || 0, dringend.length ? `open · ${dringend.length} dringend` : "open", dringend.length > 0)}
+          ${aandacht.length ? tegel("tegel-aandacht", aandacht.length, "vraagt aandacht", true) : tegel("naar-overzicht", v.aantal_open || 0, "open", false)}
           ${tegel("uren-open", uo.aantal ? String(uo.uren).replace(".", ",") + " u" : "✓", uo.aantal ? "uren schrijven" : "uren", !!uo.aantal)}
         </div>
       </section>
       <h2 class="inst-kop" id="agenda-kop">${avond ? "Morgen" : "Vandaag"}</h2>
       <div class="inst-kaart agenda-kaart">${lijst.length ? lijst.map(agRij).join("") : `<p class="inst-noot leeg">Geen afspraken</p>`}</div>
-      ${v.top.length ? `<h2 class="inst-kop kop-met-link">Nu belangrijk<button type="button" class="btn-link" id="alle-open">Alle ${v.aantal_open}</button></h2>
+      ${aandacht.length ? `<h2 class="inst-kop kop-met-link" id="aandacht-kop">Vraagt aandacht · ${aandacht.length}<button type="button" class="btn-link" id="alle-open">Alle ${v.aantal_open}</button></h2>
+        <p class="aandacht-hint">Veeg naar rechts = gedaan, naar links = niet relevant</p>
+        <div class="lijst-kaart" id="aandacht">${aandacht.map((it) => this.aandachtRij(it)).join("")}</div>` : v.top.length ? `<h2 class="inst-kop kop-met-link">Nu belangrijk<button type="button" class="btn-link" id="alle-open">Alle ${v.aantal_open}</button></h2>
         <div class="lijst-kaart" id="top">${v.top.slice(0, 3).map((it) => this.itemRij(it)).join("")}</div>` : ""}
       ${(v.opdrachten || []).length ? `<h2 class="inst-kop">Opdrachten</h2><div class="lijst-kaart">${v.opdrachten.map((o) => this.opdrachtRij(o)).join("")}</div>` : ""}
       <h2 class="inst-kop">Vraag of zeg iets</h2>
@@ -220,6 +224,9 @@ const App = {
         <button type="button" id="btn-stuur" class="btn-rond btn-rond-primair" aria-label="Versturen">${IC("ic-versturen")}</button>
       </div>`;
     this.bindItems(m);
+    this.bindVeeg(m);
+    m.querySelector("#tegel-aandacht")?.addEventListener("click", () => m.querySelector("#aandacht-kop").scrollIntoView({ behavior: "smooth", block: "start" }));
+    if (this.naarAandacht) { this.naarAandacht = false; setTimeout(() => m.querySelector("#aandacht-kop")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }
     const naarOverzicht = () => { this.project = null; this.ga("overzicht"); };
     m.querySelector("#naar-overzicht")?.addEventListener("click", naarOverzicht);
     m.querySelector("#alle-open")?.addEventListener("click", naarOverzicht);
@@ -874,6 +881,90 @@ const App = {
     </div>`;
   },
 
+  /* ---------- 'Vraagt aandacht': knoppen direct zichtbaar, vegen voor de snelle route ---------- */
+  aandachtRij(it) {
+    const a = it.aandacht || {};
+    const due = it.due_at ? `<span class="tag ${dueKleur(it.due_at)}">${datumKort(it.due_at)}</span>` : "";
+    const k = (actie, ic, label, extra = "") => `<button type="button" data-actie="${actie}"${extra}>${IC(ic)} ${label}</button>`;
+    const uitstel = k("snooze", "ic-klok", "Morgen", ' data-tot="morgen"') + k("snooze", "ic-kalender", "Volgende week", ' data-tot="volgende_week"');
+    const weg = `<button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>`;
+    const gedaan = `<button type="button" data-actie="done" class="goed">${IC("ic-vink")} Gedaan</button>`;
+    const knoppen = a.soort === "stil" ? `${k("houd", "ic-vink", "Laten staan")}${k("snooze", "ic-kalender", "Volgende week", ' data-tot="volgende_week"')}${weg}`
+      : a.soort === "wacht" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering</button>${k("houd", "ic-klok", "Nog even wachten")}${gedaan}${weg}`
+      : `${gedaan}${uitstel}${weg}${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept</button>` : ""}`;
+    return `<div class="item aandacht-item" data-id="${it.id}">
+      <div class="veeg-achter"><span class="veeg-goed">${IC("ic-vink")} Gedaan</span><span class="veeg-weg">Niet relevant ${IC("ic-sluiten")}</span></div>
+      <div class="veeg-voor">
+        <div class="aandacht-kop">
+          <span class="prio p${prioKlasse(it.prio_score)}"></span>
+          <span class="tekst"><span class="titel">${esc(it.titel)}</span><span class="sub">${it.project ? esc(it.project) + " · " : ""}<span class="reden-${esc(a.soort)}">${esc(a.tekst || "")}</span></span></span>
+          ${due}
+        </div>
+        <div class="acties">${knoppen}</div>
+      </div>
+    </div>`;
+  },
+
+  bindVeeg(root) {
+    root.querySelectorAll(".aandacht-item").forEach((kaart) => {
+      const voor = kaart.querySelector(".veeg-voor");
+      let x0 = null, y0 = null, dx = 0, zij = null;
+      voor.addEventListener("pointerdown", (e) => { if (e.target.closest("button, a")) return; x0 = e.clientX; y0 = e.clientY; dx = 0; zij = null; });
+      voor.addEventListener("pointermove", (e) => {
+        if (x0 === null) return;
+        const ddx = e.clientX - x0, ddy = e.clientY - y0;
+        if (zij === null && (Math.abs(ddx) > 10 || Math.abs(ddy) > 10)) {
+          zij = Math.abs(ddx) > Math.abs(ddy);
+          if (zij) { try { voor.setPointerCapture(e.pointerId); } catch (_) {} voor.style.transition = "none"; }
+        }
+        if (!zij) return;
+        dx = ddx;
+        voor.style.transform = `translateX(${dx}px)`;
+        kaart.classList.toggle("veeg-r", dx > 0);
+        kaart.classList.toggle("veeg-l", dx < 0);
+      });
+      const einde = () => {
+        if (x0 === null) return;
+        x0 = null;
+        voor.style.transition = "transform .18s ease-out";
+        if (zij && Math.abs(dx) > 90) {
+          voor.style.transform = `translateX(${dx > 0 ? 110 : -110}%)`;
+          try { navigator.vibrate?.(10); } catch (_) {}
+          setTimeout(() => this.itemActie(root, kaart, dx > 0 ? "done" : "dismiss"), 160);
+        } else { voor.style.transform = ""; kaart.classList.remove("veeg-r", "veeg-l"); }
+      };
+      voor.addEventListener("pointerup", einde);
+      voor.addEventListener("pointercancel", einde);
+    });
+  },
+
+  async itemActie(root, kaart, actie, tot) {
+    const id = kaart.dataset.id;
+    const titel = kaart.querySelector(".titel").textContent;
+    kaart.classList.add("weg");
+    try {
+      const res = await Api.actie(id, actie, { tot });
+      if (res && res.ok === false) throw new Error("Niet gelukt, er is niets aangepast");   // nooit "Afgevinkt" tonen als de server niets deed
+      const tekst = { done: "Afgevinkt", snooze: tot === "morgen" ? "Tot morgen uitgesteld" : "Tot volgende week uitgesteld", dismiss: "Als niet relevant gemarkeerd", reopen: "Weer actief", houd: "Blijft staan" }[actie];
+      this.toast(`${tekst}: ${titel.slice(0, 40)}${titel.length > 40 ? "…" : ""}`, actie === "reopen" || actie === "houd" ? {} : {
+        ongedaan: async () => { try { await Api.actie(id, "reopen"); this.toast("Teruggezet"); this.render(); this.checkStatus(); } catch (e) { this.toast(e.message, { fout: true }); } },
+      });
+      setTimeout(() => { kaart.remove(); this.checkStatus(); if (!root.querySelector(".item")) this.render(); else this.telAandacht(root); }, 300);
+    } catch (e) {
+      kaart.classList.remove("weg", "veeg-r", "veeg-l");
+      const voor = kaart.querySelector(".veeg-voor"); if (voor) voor.style.transform = "";
+      this.toast(e.message, { fout: true });
+    }
+  },
+
+  telAandacht(root) {
+    const n = root.querySelectorAll("#aandacht .aandacht-item").length;
+    const kop = root.querySelector("#aandacht-kop");
+    if (kop && kop.firstChild) kop.firstChild.textContent = `Vraagt aandacht · ${n}`;
+    const t = root.querySelector("#tegel-aandacht b"); if (t) t.textContent = n;
+    if (!n) this.render();
+  },
+
   bindItems(root) {
     root.querySelectorAll(".item-kop").forEach((k) => k.addEventListener("click", () => {
       const open = k.getAttribute("aria-expanded") === "true";
@@ -890,20 +981,7 @@ const App = {
       try { await Api.uitvoeren(b.dataset.uitvoeren); this.toast("Opdracht gegeven, je krijgt een melding als het klaar is"); }
       catch (e) { b.disabled = false; this.toast(e.message, { fout: true }); }
     }));
-    root.querySelectorAll(".item .acties button[data-actie]").forEach((b) => b.addEventListener("click", async () => {
-      const kaart = b.closest(".item"), id = kaart.dataset.id, actie = b.dataset.actie;
-      const titel = kaart.querySelector(".titel").textContent;
-      kaart.classList.add("weg");
-      try {
-        const res = await Api.actie(id, actie, { tot: b.dataset.tot });
-        if (res && res.ok === false) throw new Error("Niet gelukt, er is niets aangepast");   // nooit "Afgevinkt" tonen als de server niets deed
-        const tekst = { done: "Afgevinkt", snooze: b.dataset.tot === "morgen" ? "Tot morgen uitgesteld" : "Tot volgende week uitgesteld", dismiss: "Als niet relevant gemarkeerd", reopen: "Weer actief" }[actie];
-        this.toast(`${tekst}: ${titel.slice(0, 40)}${titel.length > 40 ? "…" : ""}`, actie === "reopen" ? {} : {
-          ongedaan: async () => { try { await Api.actie(id, "reopen"); this.toast("Teruggezet"); this.render(); this.checkStatus(); } catch (e) { this.toast(e.message, { fout: true }); } },
-        });
-        setTimeout(() => { kaart.remove(); this.checkStatus(); if (!root.querySelector(".item")) this.render(); }, 300);
-      } catch (e) { kaart.classList.remove("weg"); this.toast(e.message, { fout: true }); }
-    }));
+    root.querySelectorAll(".item .acties button[data-actie]").forEach((b) => b.addEventListener("click", () => this.itemActie(root, b.closest(".item"), b.dataset.actie, b.dataset.tot)));
   },
 
   /* WBSO: per jaar aanvinken welke projecten meetellen (klein, eens per jaar). */
