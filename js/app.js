@@ -296,7 +296,7 @@ const App = {
   vragenHtml(o) {
     const vs = o.context?.vragen || [];
     return vs.map((v) => v.gekozen != null
-      ? `<p class="keuze-gekozen">${IC("ic-vink")} ${esc(v.opties[v.gekozen]?.label || "")}</p>`
+      ? `<p class="keuze-gekozen">${IC("ic-vink")} <span>${esc(v.data?.kort || v.tekst)}: <b>${esc(v.opties[v.gekozen]?.label || "")}</b></span></p>`
       : `<div class="keuze"><p class="keuze-vraag">${esc(v.tekst)}</p><div class="keuze-opties">${v.opties.map((x, i) =>
           `<button type="button" data-keuze="${o.id}|${esc(v.id)}|${i}"><b>${esc(x.label)}</b>${x.sub ? `<span>${esc(x.sub)}</span>` : ""}</button>`).join("")}</div></div>`).join("");
   },
