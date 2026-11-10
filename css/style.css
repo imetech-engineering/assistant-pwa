@@ -671,3 +671,8 @@ html body { height: var(--app-h, 100dvh); }
 .aandacht-item.veeg-l .veeg-achter { background: var(--bg-hover); color: var(--text-secondary); justify-content: flex-end; }
 .aandacht-item.veeg-l .veeg-weg { opacity: 1; }
 .aandacht-item.veeg-l .veeg-goed { display: none; }
+
+/* Microsoft To Do in instellingen */
+.todo-lijst { list-style: none; margin: 0 0 12px; padding: 0; font-size: 0.9rem; }
+.todo-lijst li { padding: 6px 0; border-bottom: 1px solid var(--rand, rgba(127,127,127,.2)); }
+.todo-lijst li:last-child { border-bottom: 0; }

@@ -45,6 +45,8 @@ const Api = {
   wbsoZet(jaar, projecten) { return this.call("/instellingen/wbso", { method: "POST", body: { jaar, projecten } }); },
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },
   verbruik(dagen = 14) { return this.call("/verbruik?dagen=" + dagen); },
+  todo() { return this.call("/todo"); },
+  todoSync(proef = false) { return this.call("/todo/sync" + (proef ? "?proef=true" : ""), { method: "POST" }); },
   verbruikGrens(tokens_week) { return this.call("/verbruik/grens", { method: "POST", body: { tokens_week } }); },
   urenVoorstel() { return this.call("/uren/voorstel"); },
   urenMeet() { return this.call("/uren/voorstel?achtergrond=1", { method: "POST" }); },

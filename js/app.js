@@ -984,6 +984,34 @@ const App = {
     root.querySelectorAll(".item .acties button[data-actie]").forEach((b) => b.addEventListener("click", () => this.itemActie(root, b.closest(".item"), b.dataset.actie, b.dataset.tot)));
   },
 
+  /* Microsoft To Do: welke lijsten gekoppeld zijn en wat de koppeling de laatste tijd gedaan heeft. */
+  async rTodo(el) {
+    let t;
+    try { t = await Api.todo(); } catch (e) { el.innerHTML = `<p class="stil">${esc(e.message)}</p>`; return; }
+    const ROL = { "pijplijn:aanvraag": "fase aanvraag", "pijplijn:offerte": "fase offerte", "pijplijn:lopend": "fase lopend", "pijplijn:te_factureren": "fase te factureren",
+      "pijplijn:betaling": "afvinken als betaald", "pijplijn:afgerond": "fase afgerond", inkoop_geboekt: "afvinken als geboekt", inkoop_betaald: "afvinken als betaald",
+      los: "punten in de assistent", gedeeld: "alleen lezen" };
+    const ACTIE = { verplaatst: "Verplaatst", aangemaakt: "Aangemaakt", afgevinkt: "Afgevinkt", gekoppeld: "Gekoppeld", dubbel_opgeruimd: "Dubbele weg",
+      fase_uit_todo: "Fase uit To Do", item_nieuw: "Nieuw punt", item_af: "Punt af", item_weg: "Punt weg", item_bijgewerkt: "Punt bijgewerkt",
+      todo_bijgewerkt: "To Do bijgewerkt", item_heropend: "Punt heropend", heropend_in_todo: "Heropend in To Do",
+      project_taak_weg_in_todo: "Weggehaald in To Do", project_taak_afgevinkt_in_todo: "Afgevinkt in To Do" };
+    const st = t.status || {};
+    const lijsten = (st.lijsten || []).map((l) => `<li><strong>${esc(l.naam)}</strong> <span class="stil">${esc(ROL[l.rol] || l.rol)} · ${l.open} open</span></li>`).join("");
+    const log = (t.log || []).slice(0, 20).map((r) => `<li><span class="stil">${tijdNl(r.at)}</span> ${esc(ACTIE[r.actie] || r.actie)}: ${esc(r.titel)}${r.van && r.naar ? ` <span class="stil">(${esc(r.van)} naar ${esc(r.naar)})</span>` : r.lijst ? ` <span class="stil">(${esc(r.lijst)})</span>` : ""}</li>`).join("");
+    el.innerHTML = `
+      ${!t.aan ? `<p class="hint">De koppeling staat uit.</p>` : st.fout ? `<p class="inst-noot fout">${esc(st.fout)}</p>` : `<p class="hint">Laatst bijgewerkt ${st.laatste_run ? tijdNl(st.laatste_run) : "nog niet"}. Lijst 'IMeTech gegevens' wordt nooit gelezen.</p>`}
+      ${lijsten ? `<h3 class="verbruik-sub">Gekoppelde lijsten</h3><ul class="todo-lijst">${lijsten}</ul>` : ""}
+      <h3 class="verbruik-sub">Laatst gedaan</h3>
+      ${log ? `<ul class="todo-lijst">${log}</ul>` : `<p class="stil">Nog niets.</p>`}
+      ${t.aan ? `<div class="rij"><button type="button" id="todo-nu" class="btn-primary">Nu bijwerken</button></div>` : ""}`;
+    el.querySelector("#todo-nu")?.addEventListener("click", async (e) => {
+      e.target.disabled = true;
+      try { const r = await Api.todoSync(); this.toast(r.fout ? r.fout : r.overgeslagen ? "Is al bezig" : `To Do bijgewerkt (${r.acties} ${r.acties === 1 ? "wijziging" : "wijzigingen"})`, { fout: !!r.fout }); }
+      catch (err) { this.toast(err.message, { fout: true }); }
+      this.rTodo(el);
+    });
+  },
+
   /* WBSO: per jaar aanvinken welke projecten meetellen (klein, eens per jaar). */
   async rWbso(el, jaar) {
     let w;
@@ -1135,6 +1163,7 @@ const App = {
       <div class="inst-kaart">
         ${uit("verbruik-sectie", "Verbruik", "", `<div id="verbruik-inhoud"><p class="stil">Laden…</p></div>`)}
         ${uit("wbso-sectie", "WBSO-projecten", "", `<div id="wbso-inhoud"><p class="stil">Laden…</p></div>`)}
+        ${uit("todo-sectie", "Microsoft To Do", "", `<div id="todo-inhoud"><p class="stil">Laden…</p></div>`)}
         ${rij("Laatste verzamelronde", s?.scheduler?.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet")}
         ${rij("Laatste opschoonronde", s?.scheduler?.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet")}
         ${s?.scheduler?.fouten?.length ? `<p class="inst-noot fout">${s.scheduler.fouten.map(esc).join("; ")}</p>` : ""}
@@ -1165,6 +1194,7 @@ const App = {
     m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); const o = r.opschoon || {}; this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${(r.dubbel || 0) + (o.samengevoegd || 0)} samengevoegd, ${(r.afgerond || 0) + (o.afgerond || 0)} afgerond, ${o.hernoemd || 0} bijgewerkt`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#verbruik-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rVerbruik(m.querySelector("#verbruik-inhoud")); });
     m.querySelector("#wbso-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rWbso(m.querySelector("#wbso-inhoud")); });
+    m.querySelector("#todo-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rTodo(m.querySelector("#todo-inhoud")); });
     m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },
 
