@@ -683,3 +683,10 @@ html body { height: var(--app-h, 100dvh); }
 .koppel-rij > div { min-width: 0; }
 .koppel-zoek { display: block; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .koppel-rij small { color: var(--text-secondary); font-size: 0.75rem; }
+
+/* Startscherm: vanaf 16:00 een directe ingang naar de uren die nog geschreven moeten worden */
+.uren-nu { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; margin: 12px 0 4px; padding: 12px 14px; text-align: left;
+  font: inherit; color: var(--text-primary); background: var(--accent-light); border: 1px solid var(--accent); border-radius: var(--radius-lg); cursor: pointer; }
+.uren-nu span:first-child { min-width: 0; display: flex; flex-direction: column; }
+.uren-nu small { color: var(--text-secondary); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uren-nu-ga { flex: none; font-weight: 600; color: var(--accent); }

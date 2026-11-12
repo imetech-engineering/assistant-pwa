@@ -198,6 +198,7 @@ const App = {
           ${tegel("uren-open", uo.aantal ? String(uo.uren).replace(".", ",") + " u" : "✓", uo.aantal ? "uren schrijven" : "uren", !!uo.aantal)}
         </div>
       </section>
+      ${uo.aantal && new Date().getHours() >= 16 ? `<button type="button" class="uren-nu" id="uren-nu"><span><b>${String(uo.uren).replace(".", ",")} u nog te schrijven</b><small>${esc((uo.projecten || []).join(", "))}</small></span><span class="uren-nu-ga">Nakijken</span></button>` : ""}
       <h2 class="inst-kop" id="agenda-kop">${avond ? "Morgen" : "Vandaag"}</h2>
       <div class="inst-kaart agenda-kaart">${lijst.length ? lijst.map(agRij).join("") : `<p class="inst-noot leeg">Geen afspraken</p>`}</div>
       ${aandacht.length ? `<h2 class="inst-kop kop-met-link" id="aandacht-kop">Vraagt aandacht · ${aandacht.length}<button type="button" class="btn-link" id="alle-open">Alle ${v.aantal_open}</button></h2>
@@ -240,6 +241,7 @@ const App = {
     }));
     m.querySelectorAll(".ag-rij[data-briefje]").forEach((r) => { const t = () => { r.classList.toggle("open"); r.nextElementSibling?.classList.toggle("hidden"); }; r.addEventListener("click", t); r.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); t(); } }); });
     m.querySelector("#uren-open")?.addEventListener("click", () => { this.urenOpen = true; this.render(); });
+    m.querySelector("#uren-nu")?.addEventListener("click", () => { this.urenOpen = true; this.render(); });
     m.querySelectorAll(".chip[data-vraag]").forEach((c) => c.addEventListener("click", () => this.stuur(c.dataset.vraag, false)));
     m.querySelectorAll(".chip[data-vul]").forEach((c) => c.addEventListener("click", () => { const i = m.querySelector("#vraag-tekst"); i.value = c.dataset.vul; i.focus(); }));
     m.querySelectorAll("[data-opdracht-annuleer]").forEach((b) => b.addEventListener("click", async () => { try { await Api.opdrachtAnnuleer(b.dataset.opdrachtAnnuleer); this.toast("Opdracht geannuleerd"); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } }));
