@@ -1,7 +1,7 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v64";
+const CACHE = "assistent-v65";
 const SCHIL = ["./", "index.html", "css/imetech-ui.css", "js/imetech-ui.js", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
@@ -24,8 +24,8 @@ self.addEventListener("push", (e) => {
     : d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
     : d.soort === "stil" ? [{ action: "houd", title: "Laten staan" }, { action: "dismiss", title: "Niet relevant" }]
     : d.soort === "logboek" && d.opdracht ? [{ action: "opdracht", title: "Ja, verwerken" }]
-    : d.acties && d.concept ? [{ action: "done", title: "Gedaan" }, { action: "concept", title: "Concept klaarzetten" }]
-    : (d.acties ? [{ action: "done", title: "Gedaan" }, { action: "snooze", title: "Morgen" }] : []);
+    : d.acties && d.concept ? [{ action: "done", title: d.gedaan_label || "Gedaan" }, { action: "concept", title: "Concept klaarzetten" }]
+    : (d.acties ? [{ action: "done", title: d.gedaan_label || "Gedaan" }, { action: "snooze", title: "Morgen" }] : []);
   e.waitUntil(Promise.all([
     self.registration.showNotification(d.titel || "Assistent", {
       body: d.body || "", icon: "icons/icon-192.png", badge: "icons/badge-96.png",

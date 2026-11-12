@@ -885,7 +885,6 @@ const App = {
         <div class="acties">
           ${afgehandeld ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Terugzetten</button>` : `
           ${this.itemKnoppen(it)}
-          ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}
           ${it.meta?.actie && !it.meta?.opdracht_id ? `<button type="button" data-uitvoeren="${it.id}">${IC("ic-vink")} ${esc({ projectdoc: "Verwerk in projectdoc", offerte: "Offerteconcept maken", nieuw_project: "Project aanmaken", mailconcept: "Concept klaarzetten" }[it.meta.actie] || "Uitvoeren")}</button>` : ""}
           ${it.meta?.opdracht_id ? `<p class="stil">Opdracht gegeven, wacht op uitvoering</p>` : ""}`}
           ${this.appLinks(it)}
@@ -912,6 +911,19 @@ const App = {
     if (m.soort === "factuur_open") {
       return `${k('data-actie="done"', "ic-vink", m.richting === "inkoop" ? "Is betaald" : "Is ontvangen", "goed")}${week}${weg}`;
     }
+    const morgen = k('data-actie="snooze" data-tot="morgen"', "ic-klok", "Morgen");
+    if (m.soort === "offerte_verstuurd") {   // herinneren doet n8n al; hier leg je alleen de uitkomst vast
+      return `${k('data-actie="done"', "ic-vink", "Akkoord gekregen", "goed")}${k('data-actie="dismiss"', "ic-sluiten", "Afgewezen of vervallen")}
+        ${k('data-actie="snooze" data-tot="volgende_week"', "ic-klok", "Nog een week wachten")}`;
+    }
+    if (m.soort === "mail_onbeantwoord") {
+      return `${k('data-actie="done"', "ic-vink", "Beantwoord", "goed")}${k(`data-herinnering="${it.id}"`, "ic-versturen", "Concept klaarzetten")}${morgen}${weg}`;
+    }
+    if (m.soort === "vaste_deadline") return `${k('data-actie="done"', "ic-vink", "Ingediend", "goed")}${morgen}${week}${weg}`;
+    if (m.soort === "uren_ontbrekend") return `${k("data-uren-open", "ic-klok", "Uren nakijken en schrijven", "goed")}${k('data-actie="done"', "ic-vink", "Staat er al in")}${weg}`;
+    if (m.soort === "todo" && String(m.readonly) === "true") {
+      return `<p class="stil">Uit een gedeelde To Do-lijst: afvinken doe je daar.</p>${week}${weg}`;
+    }
     if (m.wacht_op) {
       return `${k('data-actie="done"', "ic-vink", "Reactie binnen", "goed")}
         ${k(`data-herinnering="${it.id}"`, "ic-versturen", "Herinnering klaarzetten")}
@@ -928,9 +940,9 @@ const App = {
     const uitstel = k("snooze", "ic-klok", "Morgen", ' data-tot="morgen"') + k("snooze", "ic-kalender", "Volgende week", ' data-tot="volgende_week"');
     const weg = `<button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>`;
     const gedaan = `<button type="button" data-actie="done" class="goed">${IC("ic-vink")} Gedaan</button>`;
-    const knoppen = a.soort === "stil" ? `${k("houd", "ic-vink", "Laten staan")}${k("snooze", "ic-kalender", "Volgende week", ' data-tot="volgende_week"')}${weg}`
+    const knoppen = it.meta?.soort === "projectdoc_stil" ? this.itemKnoppen(it) : a.soort === "stil" ? `${k("houd", "ic-vink", "Laten staan")}${k("snooze", "ic-kalender", "Volgende week", ' data-tot="volgende_week"')}${weg}`
       : a.soort === "wacht" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering</button>${k("houd", "ic-klok", "Nog even wachten")}${gedaan}${weg}`
-      : `${gedaan}${uitstel}${weg}${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept</button>` : ""}`;
+      : this.itemKnoppen(it);
     return `<div class="item aandacht-item" data-id="${it.id}">
       <div class="veeg-achter"><span class="veeg-goed">${IC("ic-vink")} Gedaan</span><span class="veeg-weg">Niet relevant ${IC("ic-sluiten")}</span></div>
       <div class="veeg-voor">
@@ -1021,10 +1033,12 @@ const App = {
       try {
         const r = await Api.projectStatus(id, b.dataset.pstatus);
         el.remove();
+        if (root.querySelector("#aandacht")) this.telAandacht(root);
         this.toast(`Status in het projectdocument staat op ${String(r.status || b.dataset.pstatus).toLowerCase()}`, {
           knop: "Ongedaan maken", ongedaan: async () => { try { await Api.projectStatus(id, null, true); } catch (e) { this.toast(e.message, { fout: true }); } this.render(); } });
       } catch (e) { el.querySelectorAll(".acties button").forEach((x) => { x.disabled = false; }); this.toast(e.message, { fout: true }); }
     }));
+    root.querySelectorAll(".item .acties button[data-uren-open]").forEach((b) => b.addEventListener("click", () => { this.urenOpen = true; this.ga("assistent"); }));
     root.querySelectorAll(".item .acties button[data-uitvoeren]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try { await Api.uitvoeren(b.dataset.uitvoeren); this.toast("Opdracht gegeven, je krijgt een melding als het klaar is"); }
