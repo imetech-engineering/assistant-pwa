@@ -30,8 +30,8 @@
       var vorige = document.activeElement;
       var doek = document.createElement("div");
       doek.className = "ui-doek";
-      doek.innerHTML = '<div class="ui-blad" role="dialog" aria-modal="true">' +
-        (o.titel ? "<h2>" + esc(o.titel) + "</h2>" : "") + (o.tekst ? "<p>" + esc(o.tekst) + "</p>" : "") +
+      doek.innerHTML = '<div class="ui-blad" role="dialog" aria-modal="true" tabindex="-1">' +
+        (o.titel ? '<div class="ui-titel" role="heading" aria-level="2">' + esc(o.titel) + "</div>" : "") + (o.tekst ? '<div class="ui-tekst">' + esc(o.tekst) + "</div>" : "") +
         (o.invoer ? '<input type="' + (o.type || "text") + '" autocomplete="off" enterkeyhint="done">' : "") +
         '<div class="ui-knoppen"><button type="button" class="ui-nee">' + esc(o.annuleer || "Annuleren") + '</button>' +
         '<button type="button" class="ui-ok' + (o.gevaar ? " ui-gevaar" : "") + '">' + esc(o.ok || "OK") + "</button></div></div>";
@@ -49,14 +49,14 @@
       function nee() { sluit(o.invoer ? null : false); }
       function toets(e) {
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); nee(); }
-        else if (e.key === "Enter" && (!o.gevaar || o.invoer)) { e.preventDefault(); e.stopPropagation(); ja(); }
+        else if (e.key === "Enter" && (!o.gevaar || o.invoer) && !(e.target.closest && e.target.closest(".ui-nee"))) { e.preventDefault(); e.stopPropagation(); ja(); }
       }
       doek.addEventListener("click", function (e) { if (e.target === doek) nee(); });
       doek.querySelector(".ui-ok").addEventListener("click", ja);
       doek.querySelector(".ui-nee").addEventListener("click", nee);
       document.addEventListener("keydown", toets, true);
       document.body.appendChild(doek);
-      setTimeout(function () { try { (veld || doek.querySelector(o.gevaar ? ".ui-nee" : ".ui-ok")).focus(); if (veld) veld.select(); } catch (_) {} }, 30);
+      setTimeout(function () { try { (veld || doek.querySelector(".ui-blad")).focus(); if (veld) veld.select(); } catch (_) {} }, 30);
     });
   }
   function opties(a, b) { return typeof a === "string" ? Object.assign({ titel: a }, b || {}) : (a || {}); }
@@ -164,5 +164,5 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 
   window.IMeTechUI = { bevestig: bevestig, vraag: vraag, melding: melding, ongedaan: ongedaan, animeer: animeer, meldUpdates: meldUpdates,
-    skelet: skelet, ic: ic, iconen: iconen, versie: "1.1" };
+    skelet: skelet, ic: ic, iconen: iconen, versie: "1.2" };
 })();
