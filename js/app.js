@@ -492,7 +492,18 @@ const App = {
         </div>
         <div class="ur-voet"><small>${meta}</small>${stepper(r.voorstel_uren ?? 1)}</div>
       </div>`;
-    const rij = (r, i) => rijHtml(i, r.datum, r, `${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u`, rijSleutels[i]);
+    // Nieuwe meting (tijdlijn): schermtijd en het werk dat Claude zelfstandig deed staan los naast elkaar; het voorstel is de som
+    const gemetenTekst = (r) => {
+      if (r.scherm == null) return `gemeten ${r.marge ? esc(r.marge) : n(r.gemeten)} u`;
+      const delen = [];
+      if (r.scherm) delen.push(`scherm ${n(r.scherm)} u`);
+      if (r.achtergrond) delen.push(`Claude ${n(r.achtergrond)} u`);
+      if (r.afspraak) delen.push(`afspraak ${n(r.afspraak)} u`);
+      const som = delen.length > 1 ? delen.join(" + ") : `gemeten ${n(r.gemeten)} u`;
+      return som + (r.dagtotaal && r.dagtotaal !== r.gemeten ? ` · hele dag ${n(r.dagtotaal)} u` : r.hele_dag ? " · hele dag" : "");
+    };
+    const tk = d.trefkans || {};
+    const rij = (r, i) => rijHtml(i, r.datum, r, `${r.status === "aanvullen" ? `aanvulling op ${n(r.geschreven)} u · ` : ""}${r.blok === "avond" ? "avond · " : ""}${gemetenTekst(r)}`, rijSleutels[i]);
     // Geschreven (urenadministratie) naast gemeten, per project. Open regels staan hierboven al als invoer.
     const sleutel = (p) => { const nr = String(p || "").match(/^\s*(\d{4})/); return nr ? nr[1] : String(p || "").toLowerCase().replace(/\s+/g, ""); };
     // Vaste sleutel per voorgestelde regel (datum, project, blok, volgnummer bij dubbelen): hiermee onthouden we je aanpassingen
@@ -533,6 +544,7 @@ const App = {
       </div>
       ${meetBezig ? `<p class="melding-let-op" id="uren-meet-status">Bezig met meten op de Pi… dit scherm ververst vanzelf.</p>` : mt.fout ? `<p class="melding-let-op">Laatste meting mislukt${mt.klaar ? " (" + new Date(mt.klaar).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" }) + ")" : ""}: ${esc(mt.fout)}</p>` : mt.bezig ? `<p class="melding-let-op">De vorige meting is blijven hangen. Tik op de herlaadknop rechtsboven om opnieuw te meten.</p>` : !v.gemaakt ? `<p class="melding-let-op">Nog geen meting beschikbaar. Tik op de herlaadknop rechtsboven om te meten.</p>` : ""}
       ${v.voetnoot ? `<p class="melding-let-op">${esc(v.voetnoot)}</p>` : ""}
+      ${tk.aantal >= 5 ? `<p class="hint">Meting klopte de laatste ${tk.dagen} dagen bij ${tk.binnen_half_uur} van ${tk.aantal} projectdagen binnen een half uur${tk.afwijkers?.length ? `. Wijkt het meest af: ${tk.afwijkers.slice(0, 2).map((a) => `${esc(a.project)} (${a.gemiddeld_verschil > 0 ? "+" : ""}${n(a.gemiddeld_verschil)} u)`).join(", ")}` : ""}.</p>` : ""}
       ${!open.length ? `<p class="melding-goed">Alles geschreven ✓</p>` : ""}
       ${dagen.map(dagBlok).join("")}
       <p class="stil uitleg">Bestaande regels in je urenadministratie blijven zoals ze zijn; een aanvulling komt als extra regel.</p>
@@ -1013,6 +1025,30 @@ const App = {
   },
 
   /* WBSO: per jaar aanvinken welke projecten meetellen (klein, eens per jaar). */
+  /* Koppelingen van de urenmeting: venstertitel of werkmap -> project. Geleerd uit correcties en door het model, hier bij te sturen. */
+  async rKoppel(el, data) {
+    let k = data;
+    if (!k) { try { k = await Api.urenKoppelingen(); } catch (e) { el.innerHTML = `<p class="stil">${esc(e.message)}</p>`; return; } }
+    const bron = { ivo: "zelf ingesteld", correctie: "uit je correctie", model: "automatisch", standaard: "standaard" };
+    const opties = (gekozen) => [`<option value="-"${gekozen === "-" ? " selected" : ""}>Niet meetellen</option>`, ...k.projecten.map((p) => `<option${p === gekozen ? " selected" : ""}>${esc(p)}</option>`)].join("");
+    el.innerHTML = `
+      <p class="hint">Staat een venstertitel of map bij het verkeerde project, pas dat hier aan. Een zoekwoord hoeft maar een deel van de titel te zijn.</p>
+      <div class="rij"><input id="koppel-zoek" placeholder="Zoekwoord, bijv. shopify" autocomplete="off"><select id="koppel-project">${opties("")}</select><button type="button" id="koppel-opslaan" class="btn-primary">Opslaan</button></div>
+      <div class="koppel-lijst">${k.koppelingen.map((x) => `<div class="koppel-rij" data-zoek="${esc(x.zoek)}"><div><span class="koppel-zoek">${esc(x.zoek)}</span><small>${esc(x.project === "-" ? "niet meetellen" : x.project)} · ${bron[x.bron] || esc(x.bron || "")}</small></div><button type="button" class="ur-weg" aria-label="Koppeling weghalen">${IC("ic-prullenbak")}</button></div>`).join("") || `<p class="stil">Nog geen koppelingen.</p>`}</div>`;
+    el.querySelector("#koppel-opslaan").addEventListener("click", async () => {
+      const zoek = el.querySelector("#koppel-zoek").value.trim(), project = el.querySelector("#koppel-project").value;
+      if (!zoek) { this.toast("Vul een zoekwoord in"); return; }
+      try { this.rKoppel(el, await Api.urenKoppelingZet(zoek, project)); this.toast("Koppeling opgeslagen"); } catch (e) { this.toast(e.message); }
+    });
+    el.querySelectorAll(".koppel-rij .ur-weg").forEach((b) => b.addEventListener("click", async () => {
+      const rij = b.closest(".koppel-rij"), zoek = rij.dataset.zoek, oud = k.koppelingen.find((x) => x.zoek === zoek);
+      try {
+        this.rKoppel(el, await Api.urenKoppelingZet(zoek, ""));
+        this.toast("Koppeling weggehaald", { knop: "Ongedaan maken", ongedaan: async () => { if (oud) this.rKoppel(el, await Api.urenKoppelingZet(oud.zoek, oud.project)); } });
+      } catch (e) { this.toast(e.message); }
+    }));
+  },
+
   async rWbso(el, jaar) {
     let w;
     try { w = await Api.wbso(jaar); } catch (e) { el.innerHTML = `<p class="stil">${esc(e.message)}</p>`; return; }
@@ -1163,6 +1199,7 @@ const App = {
       <div class="inst-kaart">
         ${uit("verbruik-sectie", "Verbruik", "", `<div id="verbruik-inhoud"><p class="stil">Laden…</p></div>`)}
         ${uit("wbso-sectie", "WBSO-projecten", "", `<div id="wbso-inhoud"><p class="stil">Laden…</p></div>`)}
+        ${uit("koppel-sectie", "Urenmeting: wat hoort bij welk project", "", `<div id="koppel-inhoud"><p class="stil">Laden…</p></div>`)}
         ${uit("todo-sectie", "Microsoft To Do", "", `<div id="todo-inhoud"><p class="stil">Laden…</p></div>`)}
         ${rij("Laatste verzamelronde", s?.scheduler?.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet")}
         ${rij("Laatste opschoonronde", s?.scheduler?.laatste_triage ? tijdNl(s.scheduler.laatste_triage) : "nog niet")}
@@ -1194,6 +1231,7 @@ const App = {
     m.querySelector("#triage").addEventListener("click", async () => { this.toast("Bezig, kan een paar minuten duren…"); try { const r = await Api.verzamel(true); const o = r.opschoon || {}; this.toast(`Klaar: ${r.nieuw || 0} nieuw, ${(r.dubbel || 0) + (o.samengevoegd || 0)} samengevoegd, ${(r.afgerond || 0) + (o.afgerond || 0)} afgerond, ${o.hernoemd || 0} bijgewerkt`); await this.checkStatus(); this.render(); } catch (e) { this.toast(e.message, { fout: true }); } });
     m.querySelector("#verbruik-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rVerbruik(m.querySelector("#verbruik-inhoud")); });
     m.querySelector("#wbso-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rWbso(m.querySelector("#wbso-inhoud")); });
+    m.querySelector("#koppel-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rKoppel(m.querySelector("#koppel-inhoud")); });
     m.querySelector("#todo-sectie").addEventListener("toggle", (e) => { if (e.target.open) this.rTodo(m.querySelector("#todo-inhoud")); });
     m.querySelector("#briefing").addEventListener("click", async () => { try { const r = await Api.briefing(new Date().getHours() < 13 ? "ochtend" : "avond"); this.toast(r.titel || "Verstuurd"); } catch (e) { this.toast(e.message, { fout: true }); } });
   },

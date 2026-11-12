@@ -43,6 +43,8 @@ const Api = {
   opdrachtHerstel(id, vraag) { return this.call(`/opdrachten/${id}/herstel`, { method: "POST", body: { vraag } }); },
   wbso(jaar) { return this.call("/instellingen/wbso" + (jaar ? "?jaar=" + jaar : "")); },
   wbsoZet(jaar, projecten) { return this.call("/instellingen/wbso", { method: "POST", body: { jaar, projecten } }); },
+  urenKoppelingen() { return this.call("/uren/koppelingen"); },
+  urenKoppelingZet(zoek, project) { return this.call("/uren/koppelingen", { method: "POST", body: { zoek, project } }); },
   briefing(soort) { return this.call("/run/briefing/" + soort, { method: "POST" }); },
   verbruik(dagen = 14) { return this.call("/verbruik?dagen=" + dagen); },
   todo() { return this.call("/todo"); },
