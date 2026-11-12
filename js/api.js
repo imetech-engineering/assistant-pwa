@@ -27,6 +27,7 @@ const Api = {
   nieuwItem(body) { return this.call("/items", { method: "POST", body }); },
   actie(id, actie, extra = {}) { return this.call(`/items/${id}/actie`, { method: "POST", body: { actie, ...extra } }); },
   herinnering(id) { return this.call(`/items/${id}/concept`, { method: "POST" }); },
+  projectStatus(id, status, herstel = false) { return this.call(`/items/${id}/projectstatus`, { method: "POST", body: { status, herstel } }); },
   uitvoeren(id) { return this.call(`/items/${id}/uitvoeren`, { method: "POST" }); },
   chat(tekst, id) { return this.call("/chat", { method: "POST", body: { tekst, id } }); },
   chatGeschiedenis() { return this.call("/chat"); },

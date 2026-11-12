@@ -866,10 +866,14 @@ const App = {
   itemRij(it, afgehandeld = false) {
     const due = it.due_at ? `<span class="tag ${dueKleur(it.due_at)}">${datumKort(it.due_at)}</span>` : "";
     const bron = { boekhouding: "boekhouding", outlook_mail: "mail", projectdoc: "projectlogboek", uren: "uren", claude: "Claude-sessie", plaud: "opname", google_agenda: "agenda", outlook_agenda: "agenda", handmatig: "zelf toegevoegd", kalender: "vaste deadline" }[it.bron] || it.bron;
+    const stil = it.meta?.soort === "projectdoc_stil";
+    const titel = stil ? `${it.meta.project || it.project}: loopt dit project nog?` : it.titel;
+    const sub = stil ? `laatste logboek ${esc(String(it.meta.dagen_stil ?? "?"))} dagen geleden · status: ${esc(it.meta.status || "onbekend")}`
+      : `${it.project ? esc(it.project) + " · " : ""}${bron}${it.prio_reden ? " · " + esc(it.prio_reden) : ""}`;
     return `<div class="item" data-id="${it.id}">
       <button type="button" class="item-kop" aria-expanded="false">
         <span class="prio p${prioKlasse(it.prio_score)}"></span>
-        <span class="tekst"><span class="titel">${esc(it.titel)}</span><span class="sub">${it.project ? esc(it.project) + " · " : ""}${bron}${it.prio_reden ? " · " + esc(it.prio_reden) : ""}</span></span>
+        <span class="tekst"><span class="titel">${esc(titel)}</span><span class="sub">${sub}</span></span>
         ${due}
       </button>
       <div class="item-body hidden">
@@ -880,12 +884,7 @@ const App = {
         ${it.meta?.wacht_op ? `<p class="stil">Wacht op ${esc(it.meta.wacht_op)}${it.last_touched_at ? " sinds " + datumKort(it.last_touched_at.slice(0, 10)) : ""}</p>` : ""}
         <div class="acties">
           ${afgehandeld ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Terugzetten</button>` : `
-          <button type="button" data-actie="done" class="goed">${IC("ic-vink")} Gedaan</button>
-          ${it.meta?.voorwaarde ? `<button type="button" data-actie="reopen">${IC("ic-herstel")} Voorwaarde vervuld</button>` : `
-          <button type="button" data-actie="snooze" data-tot="morgen">${IC("ic-klok")} Morgen</button>
-          <button type="button" data-actie="snooze" data-tot="volgende_week">${IC("ic-kalender")} Volgende week</button>`}
-          <button type="button" data-actie="dismiss" class="zacht">${IC("ic-sluiten")} Niet relevant</button>
-          ${it.meta?.wacht_op ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Herinnering klaarzetten</button>` : ""}
+          ${this.itemKnoppen(it)}
           ${it.meta?.soort === "mail_onbeantwoord" ? `<button type="button" data-herinnering="${it.id}">${IC("ic-versturen")} Concept klaarzetten</button>` : ""}
           ${it.meta?.actie && !it.meta?.opdracht_id ? `<button type="button" data-uitvoeren="${it.id}">${IC("ic-vink")} ${esc({ projectdoc: "Verwerk in projectdoc", offerte: "Offerteconcept maken", nieuw_project: "Project aanmaken", mailconcept: "Concept klaarzetten" }[it.meta.actie] || "Uitvoeren")}</button>` : ""}
           ${it.meta?.opdracht_id ? `<p class="stil">Opdracht gegeven, wacht op uitvoering</p>` : ""}`}
@@ -893,6 +892,32 @@ const App = {
         </div>
       </div>
     </div>`;
+  },
+
+  /* Knoppen die passen bij wat het punt vraagt. Een stilliggend project vraagt om een status, een factuur om 'betaald',
+     iets waar je op wacht om 'reactie binnen' of een herinnering; alleen een gewone taak krijgt Gedaan / uitstellen. */
+  itemKnoppen(it) {
+    const m = it.meta || {};
+    const k = (attrs, ic, label, klasse = "") => `<button type="button" ${attrs}${klasse ? ` class="${klasse}"` : ""}>${IC(ic)} ${label}</button>`;
+    const weg = k('data-actie="dismiss"', "ic-sluiten", "Niet relevant", "zacht");
+    const week = k('data-actie="snooze" data-tot="volgende_week"', "ic-kalender", "Volgende week");
+    if (m.soort === "projectdoc_stil") {
+      const maand = new Date(Date.now() + 30 * 864e5).toLocaleDateString("sv-SE");
+      return `<p class="omschr">Zet de status goed, dan verdwijnt deze melding en klopt je projectoverzicht weer. Loopt het nog, log dan even waar het staat.</p>
+        ${k('data-pstatus="afgerond"', "ic-vink", "Project is afgerond", "goed")}
+        ${k('data-pstatus="on hold"', "ic-klok", "On hold of gestopt")}
+        ${k(`data-actie="snooze" data-tot="${maand}"`, "ic-kalender", "Loopt nog, over een maand weer")}`;
+    }
+    if (m.voorwaarde) return `${k('data-actie="done"', "ic-vink", "Gedaan", "goed")}${k('data-actie="reopen"', "ic-herstel", "Voorwaarde vervuld")}${weg}`;
+    if (m.soort === "factuur_open") {
+      return `${k('data-actie="done"', "ic-vink", m.richting === "inkoop" ? "Is betaald" : "Is ontvangen", "goed")}${week}${weg}`;
+    }
+    if (m.wacht_op) {
+      return `${k('data-actie="done"', "ic-vink", "Reactie binnen", "goed")}
+        ${k(`data-herinnering="${it.id}"`, "ic-versturen", "Herinnering klaarzetten")}
+        ${k('data-actie="snooze" data-tot="volgende_week"', "ic-klok", "Nog een week wachten")}${weg}`;
+    }
+    return `${k('data-actie="done"', "ic-vink", "Gedaan", "goed")}${k('data-actie="snooze" data-tot="morgen"', "ic-klok", "Morgen")}${week}${weg}`;
   },
 
   /* ---------- 'Vraagt aandacht': knoppen direct zichtbaar, vegen voor de snelle route ---------- */
@@ -989,6 +1014,16 @@ const App = {
       b.disabled = true;
       try { await Api.herinnering(b.dataset.herinnering); this.toast("Wordt klaargezet, je krijgt een melding als het concept in Outlook staat"); }
       catch (e) { b.disabled = false; this.toast(e.message, { fout: true }); }
+    }));
+    root.querySelectorAll(".item .acties button[data-pstatus]").forEach((b) => b.addEventListener("click", async () => {
+      const el = b.closest(".item"), id = el.dataset.id;
+      el.querySelectorAll(".acties button").forEach((x) => { x.disabled = true; });
+      try {
+        const r = await Api.projectStatus(id, b.dataset.pstatus);
+        el.remove();
+        this.toast(`Status in het projectdocument staat op ${String(r.status || b.dataset.pstatus).toLowerCase()}`, {
+          knop: "Ongedaan maken", ongedaan: async () => { try { await Api.projectStatus(id, null, true); } catch (e) { this.toast(e.message, { fout: true }); } this.render(); } });
+      } catch (e) { el.querySelectorAll(".acties button").forEach((x) => { x.disabled = false; }); this.toast(e.message, { fout: true }); }
     }));
     root.querySelectorAll(".item .acties button[data-uitvoeren]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
