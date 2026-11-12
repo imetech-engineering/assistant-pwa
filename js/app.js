@@ -1036,7 +1036,7 @@ const App = {
     el.innerHTML = `
       <p class="hint">Staat een venstertitel of map bij het verkeerde project, pas dat hier aan. Een zoekwoord hoeft maar een deel van de titel te zijn.</p>
       <div class="rij"><input id="koppel-zoek" placeholder="Zoekwoord, bijv. shopify" autocomplete="off"><select id="koppel-project">${opties("")}</select><button type="button" id="koppel-opslaan" class="btn-primary">Opslaan</button></div>
-      <div class="koppel-lijst">${k.koppelingen.map((x) => `<div class="koppel-rij" data-zoek="${esc(x.zoek)}"><div><span class="koppel-zoek">${esc(x.zoek)}</span><small>${esc(x.project === "-" ? "niet meetellen" : x.project)} · ${bron[x.bron] || esc(x.bron || "")}</small></div><button type="button" class="ur-weg" aria-label="Koppeling weghalen">${IC("ic-prullenbak")}</button></div>`).join("") || `<p class="stil">Nog geen koppelingen.</p>`}</div>`;
+      <div class="koppel-lijst">${k.koppelingen.map((x) => `<div class="koppel-rij" data-zoek="${esc(x.zoek)}"><div><span class="koppel-zoek">${esc(x.zoek)}</span><small>${esc(x.project === "-" ? "niet meetellen" : x.project === "?" ? "zegt niets over het project" : x.project)} · ${bron[x.bron] || esc(x.bron || "")}</small></div><button type="button" class="ur-weg" aria-label="Koppeling weghalen">${IC("ic-prullenbak")}</button></div>`).join("") || `<p class="stil">Nog geen koppelingen.</p>`}</div>`;
     el.querySelector("#koppel-opslaan").addEventListener("click", async () => {
       const zoek = el.querySelector("#koppel-zoek").value.trim(), project = el.querySelector("#koppel-project").value;
       if (!zoek) { this.toast("Vul een zoekwoord in"); return; }
