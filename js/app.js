@@ -464,7 +464,7 @@ const App = {
 
   /* ============================ UREN ============================ */
   async rUren(m) {
-    m.innerHTML = `<p class="stil">Urenvoorstel ophalen…</p>`;
+    m.innerHTML = window.IMeTechUI ? IMeTechUI.skelet(6) : `<p class="stil">Urenvoorstel ophalen…</p>`;
     let d;
     try { d = await Api.urenVoorstel(); } catch (e) { m.innerHTML = `<p class="fout">${esc(e.message)}</p>`; return; }
     const v = d.voorstel || {}, hist = d.historie || [];
