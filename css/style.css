@@ -690,3 +690,63 @@ html body { height: var(--app-h, 100dvh); }
 .uren-nu span:first-child { min-width: 0; display: flex; flex-direction: column; }
 .uren-nu small { color: var(--text-secondary); font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .uren-nu-ga { flex: none; font-weight: 600; color: var(--accent); }
+
+/* ---------- Bestellen (bestellijst per leverancier) ---------- */
+.bs-snel input { flex: 1; min-width: 0; }
+.bs-snel .bs-uitgebreid { padding: 0 12px; }
+.bs-snel .bs-uitgebreid .ic { width: 18px; height: 18px; }
+.bs-sugg { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 10px; }
+.bs-sugg:empty { display: none; }
+.bs-sugg .chip { display: inline-flex; align-items: center; gap: 6px; }
+.bs-sugg .chip .ic { width: 14px; height: 14px; color: var(--let-op); }
+.bs-meekaart { border-left: 3px solid var(--accent); }
+.bs-meekaart.let-op { border-left-color: var(--let-op); }
+.bs-meekaart p { margin: 0 0 6px; font-size: 0.9375rem; }
+.bs-meekaart .bs-al { display: flex; gap: 8px; color: var(--let-op); }
+.bs-meekaart .bs-al .ic { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+.bs-meekaart .btn-link { padding-left: 0; }
+.bs-groep { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); margin-bottom: 12px; overflow: hidden; transition: border-color .3s, box-shadow .3s; }
+.bs-groep.licht { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+.bs-groep-kop { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 8px 14px; }
+.bs-groep-kop > span { display: flex; flex-direction: column; min-width: 0; }
+.bs-groep-kop .sub { margin-top: 0; }
+.bs-alles { min-height: 32px; padding: 4px 10px; font-size: 0.8125rem; font-weight: 500; background: var(--accent-light); color: var(--accent); border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bs-alles .ic { width: 16px; height: 16px; }
+.bs-rij { position: relative; border-top: 1px solid var(--border); touch-action: pan-y; transition: opacity .25s, transform .25s; }
+.bs-rij.weg { opacity: 0; transform: translateX(30px); }
+.bs-rij .veeg-voor { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 10px; background: var(--bg-primary); will-change: transform; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.bs-rij.veeg-r .veeg-achter { background: var(--goed-light); color: var(--goed); }
+.bs-rij.veeg-r .veeg-goed, .bs-rij.veeg-l .veeg-weg { opacity: 1; }
+.bs-rij.veeg-l .veeg-achter { background: var(--danger-light); color: var(--danger); justify-content: flex-end; }
+.bs-vink { flex: none; width: 26px; height: 26px; min-width: 26px; min-height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--border-strong); background: transparent; position: relative; }
+.bs-vink::after { content: ""; position: absolute; inset: -9px; }   /* groter raakvlak */
+.bs-vink:active { background: var(--goed-light); border-color: var(--goed); }
+.bs-tekst { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bs-tekst .titel { font-size: 0.9375rem; overflow-wrap: anywhere; }
+.bs-tekst .sub { overflow-wrap: anywhere; }
+.bs-vast .ic { width: 13px; height: 13px; color: var(--let-op); margin-left: 6px; vertical-align: -1px; }
+.bs-link { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; color: var(--accent); }
+.bs-link .ic { width: 18px; height: 18px; }
+.bs-link:active { background: var(--accent-light); }
+.bs-blok { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 12px; }
+.bs-vrij { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 14px; border-top: 1px solid var(--border); cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.bs-vrij:first-child { border-top: 0; }
+.bs-vrij:active { background: var(--bg-hover); }
+.bs-op { flex: none; min-height: 34px; padding: 4px 10px; font-size: 0.8125rem; font-weight: 500; background: var(--accent-light); color: var(--accent); border-radius: 999px; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bs-op .ic { width: 15px; height: 15px; }
+.bs-toggle { margin: 6px 0 6px -4px; }
+.bs-voet { margin: 18px 2px 8px; font-size: 0.8125rem; }
+.bs-blad { max-height: calc(100vh - 80px); }
+.bs-blad-inhoud { overflow-y: auto; padding: 8px 14px 14px; }
+.bs-form { display: flex; flex-direction: column; gap: 10px; }
+.bs-twee { display: grid; grid-template-columns: 90px 1fr; gap: 8px; }
+.bs-veld { display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; color: var(--text-secondary); }
+.bs-veld input, .bs-veld select { font-size: 1rem; color: var(--text-primary); width: 100%; min-width: 0; }
+.bs-schakel { padding: 6px 0; border: 0; }
+.bs-schakel small { display: block; color: var(--text-tertiary); font-size: 0.75rem; font-weight: 400; }
+.bs-knoppen { display: flex; gap: 8px; margin-top: 14px; }
+.bs-knoppen .btn-primary { flex: 1; }
+.bs-knoppen button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.bs-knoppen .ic { width: 18px; height: 18px; }
+.bs-knoppen .bs-rood { color: var(--danger); }
+.bs-info { margin: 4px 0 0; }

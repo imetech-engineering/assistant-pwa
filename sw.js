@@ -1,8 +1,8 @@
 /* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
 importScripts("js/opslag.js");
 
-const CACHE = "assistent-v65";
-const SCHIL = ["./", "index.html", "css/imetech-ui.css", "js/imetech-ui.js", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
+const CACHE = "assistent-v66";
+const SCHIL = ["./", "index.html", "css/imetech-ui.css", "js/imetech-ui.js", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/bestellen.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SCHIL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));   // langs de HTTP-cache: altijd de verse versie
@@ -58,6 +58,14 @@ self.addEventListener("notificationclick", (e) => {
   }
   if (d.url && /^https?:\/\//.test(d.url)) {   // vertrekmelding: route openen (alleen een volledige link; "/" zou github.io openen)
     e.waitUntil(self.clients.openWindow(d.url));
+    return;
+  }
+  if (d.tab) {   // bijv. bestellijst-melding: naar die tab
+    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
+      const c = cs.find(x => x.url.startsWith(self.registration.scope));
+      if (c) { c.focus(); c.postMessage({ type: "tab", tab: d.tab }); return; }
+      return self.clients.openWindow(new URL("./?tab=" + encodeURIComponent(d.tab), self.registration.scope).href);
+    }));
     return;
   }
   e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {

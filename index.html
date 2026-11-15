@@ -32,6 +32,10 @@
       <symbol id="ic-luidspreker" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9a4 4 0 0 1 0 6" /></symbol>
       <symbol id="ic-assistent" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v4l-2 3h16l-2-3V9a6 6 0 0 0-6-6z" /><path d="M10 20a2 2 0 0 0 4 0" /><path d="M9.5 11l2 2 3.5-3.5" /></symbol>
       <symbol id="ic-lijst" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3 6h.01M3 12h.01M3 18h.01" /></symbol>
+      <symbol id="ic-winkelwagen" viewBox="0 0 24 24"><path d="M3 4h2.5l2.2 10.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.1L21 8H6.3" /><circle cx="10" cy="19.5" r="1.4" /><circle cx="17" cy="19.5" r="1.4" /></symbol>
+      <symbol id="ic-potlood" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z" /><path d="M13.5 6.5l4 4" /></symbol>
+      <symbol id="ic-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" /><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></symbol>
+      <symbol id="ic-ster" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" /></symbol>
       <symbol id="ic-instellingen" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></symbol>
     </svg>
 
@@ -59,6 +63,7 @@
     <nav class="bottom-nav" aria-label="Hoofdnavigatie">
       <button type="button" data-tab="assistent" class="actief"><svg class="ic"><use href="#ic-assistent"/></svg>Assistent</button>
       <button type="button" data-tab="overzicht"><svg class="ic"><use href="#ic-lijst"/></svg>Overzicht <span id="badge" class="badge"></span></button>
+      <button type="button" data-tab="bestellen"><svg class="ic"><use href="#ic-winkelwagen"/></svg>Bestellen <span id="badge-bestel" class="badge"></span></button>
       <button type="button" data-tab="instellingen"><svg class="ic"><use href="#ic-instellingen"/></svg>Instellingen</button>
     </nav>
 
@@ -73,6 +78,7 @@
     <script src="js/api.js"></script>
     <script src="js/spraak.js"></script>
     <script src="js/install.js"></script>
+    <script src="js/bestellen.js"></script>
     <script src="js/app.js"></script>
   </body>
 </html>

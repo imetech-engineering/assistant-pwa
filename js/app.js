@@ -25,6 +25,7 @@ const App = {
         if (e.data?.type === "vernieuw") this.render();
         if (e.data?.type === "open_item" || e.data?.type === "aandacht") { this.project = null; this.naarAandacht = true; this.ga("assistent"); }
         if (e.data?.type === "uren") { this.urenOpen = true; this.ga("assistent"); }
+        if (e.data?.type === "tab" && e.data.tab) this.ga(e.data.tab);
       });
     }
     this.laadThema();
@@ -76,7 +77,7 @@ const App = {
   ga(tab) {
     this.tab = tab;
     document.querySelectorAll(".bottom-nav button").forEach((b) => b.classList.toggle("actief", b.dataset.tab === tab));
-    document.getElementById("kop").textContent = { assistent: "Assistent", overzicht: "Overzicht", instellingen: "Instellingen" }[tab] || "Assistent";
+    document.getElementById("kop").textContent = { assistent: "Assistent", overzicht: "Overzicht", bestellen: "Bestellen", instellingen: "Instellingen" }[tab] || "Assistent";
     this.render();
   },
 
@@ -105,6 +106,7 @@ const App = {
       el.textContent = problemen.length ? problemen.join(", ") : `${s.open_items} open punten · bijgewerkt ${s.scheduler.laatste_verzamel ? tijdNl(s.scheduler.laatste_verzamel) : "nog niet"}`;
       this.cache.status = s;
       document.getElementById("badge").textContent = s.open_items || "";
+      const bb = document.getElementById("badge-bestel"); if (bb) bb.textContent = s.bestellijst_open || "";
       try { if (navigator.setAppBadge) { s.urgent_items ? navigator.setAppBadge(s.urgent_items) : navigator.clearAppBadge(); } } catch (_) {}
     } catch (e) {
       el.className = "sub error"; el.textContent = "Geen verbinding met de assistent";
@@ -142,6 +144,7 @@ const App = {
     try {
       if (this.tab === "assistent") await this.rAssistent(m);
       else if (this.tab === "overzicht") await (this.project ? this.rProject(m) : this.rOverzicht(m));
+      else if (this.tab === "bestellen") await Bestellen.render(m);
       else await this.rInstellingen(m);
     } catch (e) {
       m.innerHTML = `<div class="card fout"><b>Kan de assistent niet bereiken</b><p class="stil">${esc(e.message)}</p><p class="stil">Controleer adres en token bij Instellingen.</p></div>`;
@@ -304,7 +307,7 @@ const App = {
   },
 
   belHtml(b) {
-    const label = { opdracht: "In de wachtrij: ", opdracht_wijzig: "Opdracht bijgewerkt: ", opdracht_annuleer: "Opdracht geannuleerd: ", opdracht_bestaat: "Staat al in de wachtrij: ", done: "Afgevinkt: ", dismiss: "Weg: ", snooze: "Uitgesteld: ", due: "Deadline gezet: ", hernoem: "Hernoemd: ", wacht: "Wacht op antwoord: ", houd: "Blijft staan: ", nieuw: "Toegevoegd: ", reopen: "Teruggezet: ", parkeer: "Geparkeerd: ", nieuw_project: "Project aangemaakt: ", geweigerd: "Niet uitgevoerd: " };
+    const label = { opdracht: "In de wachtrij: ", opdracht_wijzig: "Opdracht bijgewerkt: ", opdracht_annuleer: "Opdracht geannuleerd: ", opdracht_bestaat: "Staat al in de wachtrij: ", done: "Afgevinkt: ", dismiss: "Weg: ", snooze: "Uitgesteld: ", due: "Deadline gezet: ", hernoem: "Hernoemd: ", wacht: "Wacht op antwoord: ", houd: "Blijft staan: ", nieuw: "Toegevoegd: ", reopen: "Teruggezet: ", parkeer: "Geparkeerd: ", nieuw_project: "Project aangemaakt: ", geweigerd: "Niet uitgevoerd: ", bestel: "Op de bestellijst: ", bestel_besteld: "Besteld: ", bestel_weg: "Van de bestellijst: " };
     const chip = (a) => { const opd = a.actie.startsWith("opdracht"), nee = a.actie === "geweigerd"; return `<span class="tag ${nee ? "rood" : opd ? "oranje" : "groen"}">${IC(nee ? "ic-sluiten" : opd ? "ic-klok" : "ic-vink")} ${label[a.actie] || ""}${esc(a.titel)}</span>`; };
     return `<div class="bel ${b.rol}${b.wacht ? " wacht" : ""}${b.fout ? " fout" : ""}">${esc(b.tekst)}${b.acties?.length ? `<div class="bel-acties">${b.acties.map(chip).join("")}</div>` : ""}</div>`;
   },
