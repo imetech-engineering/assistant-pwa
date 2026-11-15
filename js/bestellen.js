@@ -36,7 +36,7 @@ const Bestellen = {
     const k = this.meeKaart;
     if (!k) return "";
     const mee = k.items?.length ? `<p><b>Kan mee bij ${esc(k.leverancier)}:</b> ${k.items.map((i) => esc(this.titel(i))).join(", ")}</p>` : "";
-    const al = (k.al_besteld || []).map((h) => `<p class="bs-al">${IC("ic-klok")} <span><b>Al besteld?</b> ${esc(h.wat)} staat op ${esc(h.datum)} als ${esc(h.status || "besteld")}${h.project ? " in " + esc(h.project) : ""}${h.leverancier ? " (" + esc(h.leverancier) + (h.ordernr ? " " + esc(h.ordernr) : "") + ")" : ""}.</span></p>`).join("");
+    const al = (k.al_besteld || []).map((h) => `<p class="bs-al">${IC("ic-klok")} <span><b>Al besteld?</b> ${esc(h.wat)} staat op ${esc(this.datum(h.datum))} als ${esc(h.status || "besteld")}${h.project ? " in " + esc(h.project) : ""}${h.leverancier ? " (" + esc(h.leverancier) + (h.ordernr ? " " + esc(h.ordernr) : "") + ")" : ""}.</span></p>`).join("");
     if (!mee && !al) return "";
     return `<div class="card bs-meekaart${al ? " let-op" : ""}">${al}${mee}<button type="button" class="btn-link" id="bs-mee-weg">Oké</button></div>`;
   },
@@ -81,7 +81,7 @@ const Bestellen = {
     </div>`;
   },
 
-  datum(iso) { if (!iso) return ""; const d = new Date(String(iso).slice(0, 10) + "T12:00:00"); return isNaN(d) ? iso : d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }); },
+  datum(iso) { if (!iso) return ""; const j = String(iso).match(/^(\d{2})(\d{2})(\d{2})$/); if (j) iso = `20${j[1]}-${j[2]}-${j[3]}`; const d = new Date(String(iso).slice(0, 10) + "T12:00:00"); return isNaN(d) ? iso : d.toLocaleDateString("nl-NL", { day: "numeric", month: "short" }); },
   levKey(s) { return String(s || "").toLowerCase().replace(/\(.*?\)/g, "").replace(/\.(nl|com|de|eu|be)\b/g, "").replace(/[^a-z0-9]/g, ""); },
   alleItems() { return (this.d?.groepen || []).flatMap((g) => g.items); },
 
