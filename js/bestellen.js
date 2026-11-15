@@ -136,6 +136,7 @@ const Bestellen = {
   },
 
   async zet(id, status, tekst) {
+    this.meeKaart = null;
     const it = this.alleItems().find((x) => String(x.id) === String(id));
     try {
       await Api.bestelStatus(id, status);
@@ -145,6 +146,7 @@ const Bestellen = {
   },
 
   async allesBesteld(lev) {
+    this.meeKaart = null;
     try {
       const r = await Api.bestelLevBesteld(lev);
       App.toast(`${r.ids.length} artikelen bij ${lev} op besteld`, { knop: "Ongedaan", ongedaan: async () => { try { for (const id of r.ids) await Api.bestelStatus(id, "open"); App.render(); } catch (e) { App.toast(e.message, { fout: true }); } } });

@@ -1060,7 +1060,10 @@ const App = {
     const ACTIE = { verplaatst: "Verplaatst", aangemaakt: "Aangemaakt", afgevinkt: "Afgevinkt", gekoppeld: "Gekoppeld", dubbel_opgeruimd: "Dubbele weg",
       fase_uit_todo: "Fase uit To Do", item_nieuw: "Nieuw punt", item_af: "Punt af", item_weg: "Punt weg", item_bijgewerkt: "Punt bijgewerkt",
       todo_bijgewerkt: "To Do bijgewerkt", item_heropend: "Punt heropend", heropend_in_todo: "Heropend in To Do",
-      project_taak_weg_in_todo: "Weggehaald in To Do", project_taak_afgevinkt_in_todo: "Afgevinkt in To Do" };
+      project_taak_weg_in_todo: "Weggehaald in To Do", project_taak_afgevinkt_in_todo: "Afgevinkt in To Do",
+      lijst_aangemaakt: "Lijst aangemaakt", best_nieuw: "Op de bestellijst", best_besteld: "Besteld (To Do)", best_weg: "Van de bestellijst (To Do)",
+      best_bijgewerkt: "Bestelling bijgewerkt", best_todo_af: "Besteld, afgevinkt in To Do", best_todo_weg: "Weg uit To Do",
+      best_todo_bijgewerkt: "To Do bijgewerkt", best_naar_todo: "Naar To Do" };
     const st = t.status || {};
     const lijsten = (st.lijsten || []).map((l) => `<li><strong>${esc(l.naam)}</strong> <span class="stil">${esc(ROL[l.rol] || l.rol)} · ${l.open} open</span></li>`).join("");
     const log = (t.log || []).slice(0, 20).map((r) => `<li><span class="stil">${tijdNl(r.at)}</span> ${esc(ACTIE[r.actie] || r.actie)}: ${esc(r.titel)}${r.van && r.naar ? ` <span class="stil">(${esc(r.van)} naar ${esc(r.naar)})</span>` : r.lijst ? ` <span class="stil">(${esc(r.lijst)})</span>` : ""}</li>`).join("");
