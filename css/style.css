@@ -441,6 +441,7 @@ button.inst-knop:active, a.inst-knop:active, .inst-uit > summary:active { backgr
 .lijst-kaart > .opdracht { padding: 12px 14px; }
 .opdracht .kop { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .opdracht p { margin: 4px 0 0; }
+.opdracht .stil, .keuze-vraag { white-space: pre-line; }
 /* Suggesties op één rij, horizontaal scrollen */
 .chips-scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 8px; padding: 0 16px 2px; scroll-padding: 16px; }
 .chips-scroll::-webkit-scrollbar { display: none; }
