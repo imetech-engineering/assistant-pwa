@@ -1,122 +1,14 @@
-/* Service worker: push-meldingen met actieknoppen, en offline de app-schil. */
-importScripts("js/opslag.js");
-
-const CACHE = "assistent-v69";
-const SCHIL = ["./", "index.html", "css/imetech-ui.css", "js/imetech-ui.js", "manifest.json", "css/style.css", "js/opslag.js", "js/api.js", "js/spraak.js", "js/install.js", "js/app.js", "js/bestellen.js", "js/melding.js", "js/terug.js", "js/imetech-apps.js", "icons/icon-192.png", "icons/icon-512.png", "branding/logo-zwart.png", "branding/logo-wit.png"];
-
-self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SCHIL.map(u => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));   // langs de HTTP-cache: altijd de verse versie
+/**
+ * De assistent-PWA is verhuisd naar https://apps.imetech.nl/assistent/ (november 2026).
+ * Deze service worker bewaart niets meer: hij gooit de oude cache weg, zegt het abonnement op meldingen op, meldt
+ * zichzelf af en laadt open vensters opnieuw, zodat iedereen de doorverwijzing in index.html ziet.
+ */
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    for (const naam of await caches.keys()) await caches.delete(naam);
+    try { const abo = await self.registration.pushManager.getSubscription(); if (abo) await abo.unsubscribe(); } catch (_) {}
+    await self.registration.unregister();
+    for (const venster of await self.clients.matchAll({ type: "window" })) venster.navigate(venster.url);
+  })());
 });
-self.addEventListener("activate", (e) => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
-});
-self.addEventListener("fetch", (e) => {
-  const url = new URL(e.request.url);
-  if (url.origin !== location.origin || e.request.method !== "GET") return;   // API-calls gaan direct naar de Pi
-  e.respondWith(fetch(e.request).then(r => { const kopie = r.clone(); caches.open(CACHE).then(c => c.put(e.request, kopie)); return r; }).catch(() => caches.match(e.request)));
-});
-
-self.addEventListener("push", (e) => {
-  let d = {};
-  try { d = e.data.json(); } catch (_) { d = { titel: "Assistent", body: e.data ? e.data.text() : "" }; }
-  const acties = d.soort === "keuze" && d.vraag ? d.vraag.opties.slice(0, 2).map((t, i) => ({ action: "kies:" + i, title: t }))
-    : d.soort === "vertrek" ? [{ action: "route", title: "Route" }]
-    : d.soort === "wacht" ? [{ action: "herinnering", title: "Herinnering klaarzetten" }, { action: "snooze", title: "Nog even wachten" }]
-    : d.soort === "stil" ? [{ action: "houd", title: "Laten staan" }, { action: "dismiss", title: "Niet relevant" }]
-    : d.soort === "logboek" && d.opdracht ? [{ action: "opdracht", title: "Ja, verwerken" }]
-    : d.acties && d.concept ? [{ action: "done", title: d.gedaan_label || "Gedaan" }, { action: "concept", title: "Concept klaarzetten" }]
-    : (d.acties ? [{ action: "done", title: d.gedaan_label || "Gedaan" }, { action: "snooze", title: "Morgen" }] : []);
-  e.waitUntil(Promise.all([
-    self.registration.showNotification(d.titel || "Assistent", {
-      body: d.body || "", icon: "icons/icon-192.png", badge: "icons/badge-96.png",
-      tag: d.item_id ? "item-" + d.item_id : d.soort || "info", renotify: false,
-      data: d, actions: acties, vibrate: d.soort === "urgent" ? [120, 60, 120] : [80],
-    }),
-    self.clients.matchAll({ type: "window" }).then(cs => cs.forEach(c => c.postMessage({ type: "vernieuw" }))),
-  ]));
-});
-
-self.addEventListener("notificationclick", (e) => {
-  const d = e.notification.data || {};
-  e.notification.close();
-  if (e.action && e.action.startsWith("kies:") && d.vraag) {
-    e.waitUntil(kies(d.opdracht_id, d.vraag.id, Number(e.action.slice(5)), d.vraag.opties));
-    return;
-  }
-  if (e.action === "opdracht" && d.opdracht) {
-    e.waitUntil(opdracht(d.opdracht));
-    return;
-  }
-  if (e.action && d.item_id) {
-    e.waitUntil(actie(d.item_id, e.action, d.melding_id));
-    return;
-  }
-  if (!e.action && d.projectdoc) {   // logboekmelding: meteen loggen in de projectdoc-app
-    const q = new URLSearchParams({ tab: "loggen", project: d.projectdoc.project || "", tekst: d.projectdoc.tekst || "" });
-    e.waitUntil(self.clients.openWindow("https://imetech-engineering.github.io/projectdoc-pwa/?" + q));
-    return;
-  }
-  if (d.url && /^https?:\/\//.test(d.url)) {   // vertrekmelding: route openen (alleen een volledige link; "/" zou github.io openen)
-    e.waitUntil(self.clients.openWindow(d.url));
-    return;
-  }
-  if (d.tab) {   // bijv. bestellijst-melding: naar die tab
-    e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
-      const c = cs.find(x => x.url.startsWith(self.registration.scope));
-      if (c) { c.focus(); c.postMessage({ type: "tab", tab: d.tab }); return; }
-      return self.clients.openWindow(new URL("./?tab=" + encodeURIComponent(d.tab), self.registration.scope).href);
-    }));
-    return;
-  }
-  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cs => {
-    const uren = d.soort === "uren";
-    const aandacht = !!d.item_id || d.soort === "aandacht";   // tik op een punt-melding: naar 'Vraagt aandacht' om het af te handelen
-    const doel = new URL("./?tab=assistent" + (uren ? "&uren=1" : aandacht ? "&aandacht=1" : ""), self.registration.scope).href;
-    const c = cs.find(x => x.url.startsWith(self.registration.scope));
-    if (c) { c.focus(); c.postMessage({ type: uren ? "uren" : aandacht ? "aandacht" : "vernieuw", item_id: d.item_id }); return; }
-    return self.clients.openWindow(doel);
-  }));
-});
-
-async function kies(oid, vid, i, labels) {
-  const c = await Opslag.instellingen();
-  if (!c.adres || !c.token) return;
-  try {
-    const r = await fetch(c.adres.replace(/\/$/, "") + `/api/opdrachten/${oid}/kies`, { method: "POST", headers: { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" }, body: JSON.stringify({ vraag: vid, optie: i }) });
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || "fout");
-    await self.registration.showNotification((labels[i] || "Keuze") + " gekozen", { body: "Wordt ingevoerd. Ongedaan maken kan in de app.", icon: "icons/icon-192.png", tag: "bevestiging", silent: true });
-    (await self.clients.matchAll({ type: "window" })).forEach(x => x.postMessage({ type: "vernieuw" }));
-  } catch (e) {
-    await self.registration.showNotification("Niet gelukt", { body: (e.message && e.message !== "fout" ? e.message + ". " : "") + "Open de app en kies daar.", icon: "icons/icon-192.png", tag: "bevestiging" });
-  }
-}
-
-async function opdracht(o) {
-  const c = await Opslag.instellingen();
-  if (!c.adres || !c.token) return;
-  try {
-    await fetch(c.adres.replace(/\/$/, "") + "/api/opdrachten", { method: "POST", headers: { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" }, body: JSON.stringify(o) });
-    await self.registration.showNotification("Wordt verwerkt", { body: "Je krijgt een melding als het in het logboek staat.", icon: "icons/icon-192.png", tag: "bevestiging", silent: true });
-  } catch (e) {
-    await self.registration.showNotification("Niet gelukt", { body: "Open de app en probeer opnieuw.", icon: "icons/icon-192.png", tag: "bevestiging" });
-  }
-}
-
-async function actie(itemId, actie, meldingId) {
-  const c = await Opslag.instellingen();
-  if (!c.adres || !c.token) return;
-  const body = { actie, melding_id: meldingId || null };
-  if (actie === "snooze") body.tot = "morgen";
-  const kop = { "Authorization": "Bearer " + c.token, "Content-Type": "application/json" };
-  try {
-    if (actie === "herinnering" || actie === "concept") {
-      await fetch(c.adres.replace(/\/$/, "") + `/api/items/${itemId}/concept`, { method: "POST", headers: kop });
-    } else {
-      await fetch(c.adres.replace(/\/$/, "") + `/api/items/${itemId}/actie`, { method: "POST", headers: kop, body: JSON.stringify(body) });
-    }
-    await self.registration.showNotification({ done: "Afgevinkt", snooze: "Uitgesteld tot morgen", herinnering: "Herinnering wordt klaargezet", concept: "Concept wordt klaargezet", houd: "Blijft staan", dismiss: "Weg" }[actie] || "Ok", { icon: "icons/icon-192.png", tag: "bevestiging", silent: true });
-    (await self.clients.matchAll({ type: "window" })).forEach(x => x.postMessage({ type: "vernieuw" }));
-  } catch (e) {
-    await self.registration.showNotification("Niet gelukt", { body: "Open de app en probeer opnieuw.", icon: "icons/icon-192.png", tag: "bevestiging" });
-  }
-}
